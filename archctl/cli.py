@@ -5,6 +5,19 @@ import sys
 import click
 
 from archctl import __version__
+from archctl.logger import setup_logger
+
+verbose = [
+    click.option('-v', '--verbose', is_flag=True, default=False)
+]
+
+
+def add_options(options):
+    def _add_options(func):
+        for option in reversed(options):
+            func = option(func)
+        return func
+    return _add_options
 
 
 def version_msg():
@@ -35,7 +48,6 @@ def main():
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.option(
     '-y', '--yes-all', 'yes',
     is_flag=True, default=False,
@@ -47,17 +59,18 @@ def main():
 )
 @click.argument('repo', callback=validate_repo)
 @click.argument('kind', type=click.Choice(['P', 'T'], case_sensitive=False))
-def register(yes, branch, repo, kind, v):
+@add_options(verbose)
+def register(**kwargs):
     """\b
     Registers a new project in the user's config
         REPO        Name (owner/name) or URL of the repo being added
         KIND        Kind of repo --> P for Project or T for Template
     """
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.option(
     '-c', '--cookies',
     type=click.File(mode='r', errors='strict'),
@@ -65,45 +78,51 @@ def register(yes, branch, repo, kind, v):
 )
 @click.argument('name')
 @click.argument('template')
-def create(name, template, cookies, v):
+@add_options(verbose)
+def create(**kwargs):
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.argument('repos', nargs=-1)
 @click.argument('template')
-def upgrade(repos, template, v):
+@add_options(verbose)
+def upgrade(**kwargs):
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.argument('repo')
 @click.argument('template')
-def preview(repo, template, v):
+@add_options(verbose)
+def preview(**kwargs):
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.argument('repo')
 @click.option(
     '-d', '--depth', type=int, default=3,
     help="Number of commits to search for in each template/branch"
 )
-def search(repo, depth, v):
+@add_options(verbose)
+def search(**kwargs):
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
 @main.command()
-@click.option('-v', '--verbose', 'v', is_flag=True, default=False)
 @click.argument('repo')
 @click.option(
     '-d', '--depth', type=int, default=3,
     help=""
 )
-def version(repo, depth, v):
+@add_options(verbose)
+def version(**kwargs):
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
     pass
 
 
