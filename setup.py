@@ -1,4 +1,4 @@
-"""archctl distutils configuration."""
+"""archctl configuration."""
 from setuptools import setup
 
 version = "0.0.1"
@@ -7,7 +7,8 @@ with open('README.md', encoding='utf-8') as readme_file:
     readme = readme_file.read()
 
 requirements = [
-    'click>=7.0,<9.0.0'
+    'click>=7.0,<9.0.0',
+    'PyInquirer'
 ]
 
 setup(
