@@ -38,18 +38,9 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest
         run: |
-          pytest tests/ --doctest-modules --junitxml=junit/test-results.xml --cov=archctl --cov-report=xml --cov-report=html
+          pytest . --doctest-modules --junitxml=junit/test-results.xml --cov=archctl --cov-report=xml --cov-report=html
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          with:
-            args: >
-              -Dsonar.organization=archctl
-              -Dsonar.projectKey=archctl_archctl
-              -Dsonar.python.coverage.reportPaths=coverage.xml
-              -Dsonar.sources=archctl/
-              -Dsonar.test.exclusions=tests/**
-              -Dsonar.tests=tests/
-              -Dsonar.verbose=true
