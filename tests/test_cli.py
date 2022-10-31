@@ -5,8 +5,6 @@ import pytest
 
 from click.testing import CliRunner
 
-from .context import archctl
-
 from archctl.__main__ import main
 
 
