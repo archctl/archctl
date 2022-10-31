@@ -1,6 +1,4 @@
-import os
-import sys
-
+"""Main cli behaviour for archctl"""
 import pytest
 
 from click.testing import CliRunner
@@ -18,7 +16,7 @@ def cli_runner():
         return runner.invoke(main, cli_args, **cli_kwargs)
 
     return cli_main
-    
+
 
 @pytest.fixture(params=['-V', '--version'])
 def version_cli_flag(request):
@@ -28,7 +26,6 @@ def version_cli_flag(request):
 
 def test_cli_version(cli_runner, version_cli_flag):
     """Verify Archctl version output by `archctl` on cli invocation."""
-    runner = CliRunner()
 
     result = cli_runner(version_cli_flag)
     assert result.exit_code == 0

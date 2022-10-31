@@ -15,6 +15,7 @@ LOG_FORMATS = {
     'INFO': '%(levelname)s: %(message)s',
 }
 
+
 def setup_logger(stream_level='DEBUG'):
     """Configure logger for archctl
     Set up logging to stdout with given level, defaults to DEBUG.

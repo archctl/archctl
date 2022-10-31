@@ -7,7 +7,11 @@ import click
 from archctl import __version__
 from archctl.logger import setup_logger
 from archctl.inquirer import interactive_prompt
-from archctl.validation import *
+from archctl.validation import (validate_template_repo, validate_template,
+                                validate_repo, validate_branch,
+                                validate_repo_name_available, validate_cookies,
+                                validate_repos, validate_depth,
+                                confirm_command_execution)
 
 
 def version_msg():
@@ -35,9 +39,16 @@ common_options = [
 ]
 
 template_options = [
-    click.option('-r','--templates-repo', required=True, callback=validate_template_repo, help='Repo containing the template'),
-    click.option('-t', '--template', required=True, callback=validate_template, help='Template to use')
+    click.option(
+        '-r', '--templates-repo', required=True,
+        callback=validate_template_repo, help='Repo containing the template'
+    ),
+    click.option(
+        '-t', '--template', required=True, callback=validate_template,
+        help='Template to use'
+    )
 ]
+
 
 def add_options(options):
     def _add_options(func):
@@ -59,7 +70,7 @@ def main(interactive):
 @main.command()
 @click.argument('repo', callback=validate_repo)
 @click.option(
-    '-k','--kind', required=True,
+    '-k', '--kind', required=True,
     type=click.Choice(['Project', 'Template'], case_sensitive=False)
     )
 @click.option(
@@ -81,7 +92,7 @@ def register(repo, kind, branch, yes, verbose):
         print('Yeah')
     else:
         confirm_command_execution()
-    
+
     pass
 
 
@@ -98,14 +109,14 @@ def register(repo, kind, branch, yes, verbose):
 def create(cookies, name, templates_repo, template, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
-    
+
     # If running in --yes-all mode, skip any user confirmation
     if yes:
         # Just do it
         print('Yeah')
     else:
         confirm_command_execution()
-    
+
     pass
 
 
@@ -147,7 +158,7 @@ def preview(repo, template, verbose, yes):
 @click.argument('repo', callback=validate_repo)
 @click.option(
     '-d', '--depth', type=int, default=3,
-    callback = validate_depth,
+    callback=validate_depth,
     help="Number of commits to search for in each template/branch"
 )
 @add_options(common_options)
@@ -168,11 +179,11 @@ def search(repo, depth, verbose, yes):
 @click.argument('repo', callback=validate_repo)
 @click.option(
     '-d', '--depth', type=int, default=5,
-    callback = validate_depth,
+    callback=validate_depth,
     help=""
 )
 @add_options(common_options)
-def version(repo, depth,verbose, yes):
+def version(repo, depth, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
@@ -186,4 +197,4 @@ def version(repo, depth,verbose, yes):
 
 
 if __name__ == "__main__":
-        main()
+    main()
