@@ -7,8 +7,8 @@ with open('README.md', encoding='utf-8') as readme_file:
     readme = readme_file.read()
 
 requirements = [
-    'click>=7.0,<9.0.0',
-    'PyInquirer'
+    'click',
+    'InquirerPy'
 ]
 
 setup(

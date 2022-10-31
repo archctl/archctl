@@ -1,6 +1,6 @@
 """Interactive questions for the main CLI commands."""
 
-from PyInquirer import prompt
+from InquirerPy import prompt
 
 from archctl.validation import validate_repo_interactive, validate_repo_name_available_interactive, validate_depth_interactive, validate_template_version_interactive 
 
