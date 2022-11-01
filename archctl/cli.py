@@ -16,8 +16,8 @@ from archctl.validation import (validate_template_repo, validate_template,
 
 def version_msg():
     """Return the Archctl version, location and Python powering it."""
-    python_version = sys.version
     location = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    python_version = sys.version
     return f"Archctl {__version__} from {location} (Python {python_version})"
 
 
