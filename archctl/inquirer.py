@@ -1,50 +1,55 @@
 """Interactive questions for the main CLI commands."""
 
-from PyInquirer import prompt
+from InquirerPy import prompt
 
-from archctl.validation import validate_repo_interactive, validate_repo_name_available_interactive, validate_depth_interactive, validate_template_version_interactive 
+from archctl.validation import (validate_repo_interactive,
+                                validate_repo_name_available_interactive,
+                                validate_depth_interactive,
+                                validate_t_version_interactive)
 
-############################### GLOBAL VARIABLES ###############################
+#  GLOBAL VARIABLES
 repo = ''
 t_repo = ''
 template = ''
 last_three = ''
-################################################################################
 
 
-### GITHUB FUNCTIONS, SUBSTITUTE IN THE FUTURE FOR THE ONES IN GIHTUB MODULE ###
+# GITHUB FUNCTIONS, SUBSTITUTE IN THE FUTURE FOR THE ONES IN GIHTUB MODULE
 def get_repo_branches(repo):
     # Get the branches through the API
     return ['develop', 'main']
+
 
 def get_available_templates(repo):
     # Get the templates through the GitHub API
     return ['java', 'php', 'vuejs']
 
-def get_last_three_versions(repo, template):
+
+def get_last_three_v(repo, template):
     # Get the last three commits for that template through the GitHub API
     global last_three
     last_three = ['7485a1fd', '5442332399', 'd5f05c84e4fd']
     return last_three
-################################################################################
 
 
-####################### GETTER FUNCTIONS FOR GLOBAL VARS #######################
+# GETTER FUNCTIONS FOR GLOBAL VARS
 def get_repo():
     return repo
+
 
 def get_t_repo():
     return t_repo
 
+
 def get_template():
     return template
 
+
 def get_last_three():
     return last_three
-################################################################################
 
 
-################################# QUESTIONS ####################################
+# QUESTIONS
 commands = [
     {
         'type': 'list',
@@ -82,7 +87,7 @@ name_question = [
 ]
 
 t_repo_question = [
-    {  
+    {
         'type': 'input',
         'name': 't_repo',
         'message': 'Name or URL of the Template\'s repository:',
@@ -112,9 +117,10 @@ template_version_question = [
     {
         'type': 'input',
         'name': 't_version',
-        'message': 'Version of the template to use. (Last three: ' + ' '.join(get_last_three_versions(get_t_repo(), get_template())) + '):',
+        'message': ('Version of the template to use. (Last three: ' +
+                    ' '.join(get_last_three_v(get_t_repo(), get_template())) + '):'),
         'default': lambda default: get_last_three()[0],
-        'validate': lambda t_version: validate_template_version_interactive(get_t_repo(), get_template(), t_version)
+        'validate': (lambda t_version: validate_t_version_interactive(get_t_repo(), get_template(), t_version))
     }
 ]
 
@@ -122,8 +128,9 @@ search_depth_question = [
     {
         'type': 'input',
         'name': 'depth',
-        'message': 'Depth of the search for each branch\n(number of commits/versions on each branch on each template) -1 to show all:',
-        'default': '3', 
+        'message': ('Depth of the search for each branch\n(number of' +
+                    'commits/versions on each branch on each template) -1 to show all:'),
+        'default': '3',
         'validate': validate_depth_interactive
     }
 ]
@@ -146,9 +153,9 @@ confirm_question = [
         'default': True,
     }
 ]
-################################################################################
 
-################################### REGISTER ###################################
+
+# REGISTER
 def register_interactive():
     global repo
 
@@ -156,10 +163,9 @@ def register_interactive():
     repo = answers['repo']
 
     return {**answers, **prompt(branch_question)}
-################################################################################
 
 
-#################################### CREATE ####################################
+# CREATE
 def create_interactive():
     global t_repo, template
 
@@ -168,12 +174,11 @@ def create_interactive():
 
     answers = {**answers, **prompt(template_question)}
     template = answers['template']
-    
+
     return {**answers, **prompt(template_version_question)}
-################################################################################
 
 
-#################################### UPGRADE ###################################
+# UPGRADE
 def upgrade_interactive():
     global t_repo, template, repo
 
@@ -184,7 +189,6 @@ def upgrade_interactive():
     template = answers['template']
 
     answers = {**answers, **prompt(template_version_question)}
-    template_version = answers['t_version']
 
     print('\n-------------------------------------------------------------')
     print('Now, please enter one or more project repositories to upgrade!')
@@ -204,10 +208,9 @@ def upgrade_interactive():
 
     answers['projects'] = projects
     return answers
-################################################################################
 
 
-#################################### PREVIEW ###################################
+# PREVIEW
 def preview_interactive():
     global t_repo, template, repo
 
@@ -221,19 +224,16 @@ def preview_interactive():
     repo = answers['repo']
 
     return {**answers, **prompt(branch_question)}
-################################################################################
 
 
-#################################### SEARCH ####################################
+# SEARCH
 def search_interactive():
     return prompt(t_repo_question + search_depth_question)
-################################################################################
 
 
-#################################### VERSION ###################################
+# VERSION
 def version_interactive():
     return prompt(t_repo_question + version_depth_question)
-################################################################################
 
 
 def interactive_prompt():
