@@ -8,16 +8,16 @@ with open('README.md', encoding='utf-8') as readme_file:
 
 requirements = [
     'click',
-    'InquirerPy'
+    'InquirerPy',
+    'cookiecutter'
 ]
 
 setup(
     name='archctl',
     version=version,
     description=(
-        'A command-line utility that uses cookiecutter to '
-        'perform actions on company repos, such as rendering  '
-        'the archetype to update a project.'
+        'A command-line utility that wraps the use of cookiecutter and'
+        'manages both Templates and Projects GitHub Repositories'
     ),
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -33,19 +33,12 @@ setup(
     license='GPL-3.0',
     zip_safe=False,
     classifiers=[
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 2 - Pre-Alpha",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Natural Language :: English",
-        "License :: OSI Approved :: BSD License",
-        "Programming Language :: Python :: 3 :: Only",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: Implementation :: CPython",
-        "Programming Language :: Python :: Implementation :: PyPy",
         "Programming Language :: Python",
         "Topic :: Software Development",
     ],
