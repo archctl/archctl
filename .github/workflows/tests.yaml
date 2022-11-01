@@ -7,7 +7,6 @@ on:
 jobs:
 
   Tests:
-    if: ! github.event.pull_request.draft
     runs-on: ubuntu-latest # ${{ matrix.os }}
     
     # strategy:
