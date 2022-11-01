@@ -14,7 +14,7 @@ def ask_confirmation(msg):
 
     if stop in deny:
         click.echo('Canceling command and exiting')
-        exit(0)
+        exit(1)
 
 
 def is_repo(repo):
