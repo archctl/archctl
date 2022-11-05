@@ -28,15 +28,12 @@ def write_user_config(config):
         json.dump(config, outfile)
 
 
-def create_config_file(config=None):
+def create_config_file():
     """Create the user config file if it didn't exist"""
 
     if not user_config_exists():
         with open(config_path, 'w') as outfile:
-            if config is not None:
-                json.dump(config, outfile)
-            else:
-                json.dump(base_config, outfile)
+            json.dump(base_config, outfile)
 
 
 def check_p_repo_format(*args):

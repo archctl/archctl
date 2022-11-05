@@ -59,14 +59,16 @@ def test_delete_p():
     uc.add_p_repo(p_repo_1)
     uc.add_p_repo(p_repo_2)
 
-    res = uc.delete_p_repo(p_repo_1)
+    res1 = uc.delete_p_repo(p_repo_1)
+    res2 = uc.delete_p_repo(p_repo_1)
 
     config = uc.read_user_config()['p_repos']
 
     match1 = [x for x in config if x == p_repo_1]
     match2 = [x for x in config if x == p_repo_2]
 
-    assert res is True
+    assert res1 is True
+    assert res2 is False
     assert len(config) == 1
     assert len(match1) == 0
     assert len(match2) == 1
@@ -76,14 +78,16 @@ def test_delete_t():
     uc.add_t_repo(t_repo_1)
     uc.add_t_repo(t_repo_2)
 
-    res = uc.delete_t_repo(t_repo_2)
+    res1 = uc.delete_t_repo(t_repo_2)
+    res2 = uc.delete_t_repo(t_repo_2)
 
     config = uc.read_user_config()['t_repos']
 
-    assert res is True
+    assert res1 is True
+    assert res2 is False
     assert len(config) == 1
     assert t_repo_1 in config
-    assert t_repo_1 in config
+    assert t_repo_2 not in config
 
 
 def test_update_p():
