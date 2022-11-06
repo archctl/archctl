@@ -1,6 +1,8 @@
 """Set of validation functions for CLI and Interactive"""
 import click
 
+import archctl.github as gh
+
 confirm = ['yes', 'ye', 'y']
 deny = ['no', 'n']
 
@@ -15,11 +17,6 @@ def ask_confirmation(msg):
     if stop in deny:
         click.echo('Canceling command and exiting')
         exit(1)
-
-
-def is_repo(repo):
-    # FILL WITH REPO VALIDATION LOGIC
-    return True
 
 
 def infer_kind(repo):
@@ -69,12 +66,11 @@ def validate_template_repo(ctx, param, value):
 
 def validate_repo_name_available(ctx, param, value):
     # Ask github API if given repo name is available (Doesn't already exist)
-    available = True
-
-    if not available:
+    if gh.check_user_auth():
+        # if gh.get_repo_info()
+        return value
+    else:
         raise click.BadParameter('A project with the same name already exists in GitHub')
-
-    return value
 
 
 def validate_template(ctx, param, value):
@@ -107,20 +103,33 @@ def validate_depth(ctx, param, value):
 
 
 def validate_repo_interactive(repo):
-    if not is_repo(repo):
-        return 'Repo must be either owner/name or a valid GitHub URL'
+    if not gh.repo_exists(repo[0], repo[1]):
+        return False
+
+    return True
+
+
+def validate_t_repo_interactive(repo):
+    if not gh.repo_exists(repo[0], repo[1]):
+        return False
+
+    templates = gh.search_templates(repo[0], repo[1])
+    if templates is None or not templates:
+        return False
 
     return True
 
 
 def validate_repo_name_available_interactive(repo):
-    # Ask github API if given repo name is available (Doesn't already exist)
-    available = True
+    """Ask github API if given repo name is available (Doesn't already exist)"""
 
-    if not available:
-        return 'A project with the same name already exists in GitHub'
-
-    return True
+    if gh.check_user_auth():
+        if gh.get_repo_info(repo[0], repo[1]) is not None:
+            return False
+        else:
+            return True
+    else:
+        return False
 
 
 def validate_depth_interactive(value):
