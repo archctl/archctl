@@ -55,13 +55,13 @@ def interactive_cli_flag(request):
     return request.param
 
 
-def test_archctl_interactive(cli_runner, interactive_cli_flag):
-    """Verify Archctl interactive options show the prompt."""
+# def test_archctl_interactive(cli_runner, interactive_cli_flag):
+#     """Verify Archctl interactive options show the prompt."""
 
-    result = cli_runner(interactive_cli_flag)
+#     result = cli_runner(interactive_cli_flag)
 
-    # Click Runner doesn't support InquirerPy's terminal UI
-    assert str(result.exception) == ('Stdin is not a terminal.')
+#     # Click Runner doesn't support InquirerPy's terminal UI
+#     assert str(result.exception) == ('Stdin is not a terminal.')
 
 
 @pytest.fixture(params=['-d', '--depth'])

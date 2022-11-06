@@ -72,7 +72,7 @@ def main(interactive):
 @click.option(
     '-k', '--kind', required=True,
     type=click.Choice(['Project', 'Template'], case_sensitive=False)
-    )
+)
 @click.option(
     '-b', '--branch', type=str, callback=validate_branch, default='main',
     help="Default branch to chekout from when updating/previewing"
