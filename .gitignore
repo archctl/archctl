@@ -132,3 +132,4 @@ dmypy.json
 # Development env
 .DS_Store
 .vscode/
+archctl/*.json
