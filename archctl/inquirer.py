@@ -2,40 +2,67 @@
 
 from InquirerPy import prompt
 
-from archctl.github import get_repo_branches, get_repo_commits, get_branch_contents
-from archctl.validation import (validate_repo_interactive,
-                                validate_repo_name_available_interactive,
-                                validate_depth_interactive,
-                                validate_t_version_interactive)
+import archctl.github as gh
+import archctl.validation as val
+import archctl.user_config as uc
 
 #  GLOBAL VARIABLES
 repo = None
 t_repo = None
 template = None
+templates = None
 last_three = None
 
 
-# GITHUB FUNCTIONS, SUBSTITUTE IN THE FUTURE FOR THE ONES IN GIHTUB MODULE
-def list_repo_branches(repo):
+def list_repo_branches():
+    """Returns a list with the names of the branches in the given repo"""
     if repo is not None:
-        s_repo = repo.split('/')
-        return get_repo_branches(s_repo[0], s_repo[1])
+        branches = (branch['name'] for branch in gh.get_branch(repo[0], repo[1]))
+        if branches is not None:
+            return branches
+        else:
+            return []
     else:
         return []
 
 
-def get_available_templates(repo):
-    # Get the templates through the GitHub API
-    s_repo = repo.split('/')
-    return get_branch_contents(s_repo[0], s_repo[1], '')
+def get_available_templates():
+    """Sets the global variable paths to contain the paths of all"""
+
+    global templates
+    templates = gh.search_templates(t_repo[0], t_repo[1])
+
+    return templates
 
 
-def get_last_three_v(repo, template):
+def get_last_three_v():
     # Get the last three commits for that template through the GitHub API
-    s_repo = repo.split('/')
     global last_three
-    last_three = get_repo_commits(s_repo[0], s_repo[1], 3, template)
+    path = [path for path in paths if template == path.split('/')[-2]][0]
+    commits = gh.get_commit(repo[0], repo[1], path=path)[:3]
+    last_three = [t_version['commit']['message'] for t_version in commits]
     return last_three
+
+
+# FILTERS
+def parse_repo_name(repo):
+    """Parse user input (repo | owner/repo | URL) to a list of [owner, repo]"""
+
+    s_repo = repo.split('/')  # Split the user input with sep '/'
+
+    # User input is a URL
+    if repo.startswith('https://github.com/'):
+        if repo.endswith('/'):
+            s_repo.pop()
+
+        return s_repo[-2:]
+    else:
+        if len(s_repo) == 1:  # User input is repo
+            return [gh.get_logged_user(), repo]
+        elif len(s_repo) == 2:  # User input is owner/repo
+            return s_repo
+        else:  # More than 1 '/' means user error
+            return ''  # Action if repo is not correctly entered
 
 
 # QUESTIONS
@@ -56,7 +83,22 @@ def repo_question():
             'type': 'input',
             'name': 'repo',
             'message': 'Name of the repository (owner/name or URL):',
-            'validate': validate_repo_interactive
+            'filter': parse_repo_name,
+            'validate': lambda res: val.validate_repo_interactive(parse_repo_name(res)),
+            "invalid_message": "Repository not found in Github.com"
+        }
+    ]
+
+
+def repo_checkbox_question():
+    return [
+        {
+            "type": "checkbox",
+            "message": "Pick your favourites:",
+            "choices": uc.get_p_repos,
+            "validate": lambda result: len(result) >= 1,
+            "invalid_message": "Should be at least 1 selection",
+            "instruction": "(Please, select at least 1 repository)",
         }
     ]
 
@@ -77,8 +119,11 @@ def name_question():
         {
             'type': 'input',
             'name': 'name',
-            'message': 'Name of the project that will be created:',
-            'validate': validate_repo_name_available_interactive
+            'message': ('Name of the project that will be created\n' +
+                        '(If no org is indicated, the repo will be created under the logged user account):'),
+            'filter': parse_repo_name,
+            'validate': lambda res: val.validate_repo_name_available_interactive(parse_repo_name(res)),
+            "invalid_message": "Repository already exists"
         }
     ]
 
@@ -88,8 +133,9 @@ def t_repo_question():
         {
             'type': 'input',
             'name': 't_repo',
-            'message': 'Name or URL of the Template\'s repository:',
-            'validate': validate_repo_interactive
+            'message': 'Name or URL of the Template\'s repository (owner/name or URL):',
+            'filter': parse_repo_name,
+            'validate': lambda res: val.validate_t_repo_interactive(parse_repo_name(res))
         }
     ]
 
@@ -100,7 +146,7 @@ def branch_question():
             'type': 'list',
             'name': 'branch',
             'message': 'Branch of the repository to checkout from:',
-            'choices': list_repo_branches(repo)
+            'choices': list_repo_branches()
         }
     ]
 
@@ -111,7 +157,7 @@ def template_question():
             'type': 'list',
             'name': 'template',
             'message': 'Template to render in the project:',
-            'choices': lambda templates: get_available_templates(t_repo)
+            'choices': get_available_templates()
         }
     ]
 
@@ -121,10 +167,8 @@ def template_version_question():
         {
             'type': 'input',
             'name': 't_version',
-            'message': ('Version of the template to use. (Last three: ' +
-                        ' '.join(get_last_three_v(t_repo, template)) + '):'),
-            'default': lambda default: last_three[0],
-            'validate': (lambda t_version: validate_t_version_interactive(t_repo, template, t_version))
+            'message': ('Version of the template to use. (Last three: ' + str(get_last_three_v(t_repo)) + '):'),
+            'validate': (lambda t_version: val.validate_t_version_interactive(t_repo, template, t_version))
         }
     ]
 
@@ -137,7 +181,7 @@ def search_depth_question():
             'message': ('Depth of the search for each branch\n(number of' +
                         'commits/versions on each branch on each template) -1 to show all:'),
             'default': '3',
-            'validate': validate_depth_interactive
+            'validate': val.validate_depth_interactive
         }
     ]
 
@@ -149,7 +193,7 @@ def version_depth_question():
             'name': 'depth',
             'message': 'Number of renders to show info about, -1 to show all:',
             'default': '5',
-            'validate': validate_depth_interactive
+            'validate': val.validate_depth_interactive
         }
     ]
 
@@ -192,17 +236,9 @@ def create_interactive():
 def upgrade_interactive():
     global t_repo, template, repo
 
-    answers = prompt(t_repo_question())
-    t_repo = answers['t_repo']
-
-    answers = {**answers, **prompt(template_question())}
-    template = answers['template']
-
-    answers = {**answers, **prompt(template_version_question())}
-
-    print('\n-------------------------------------------------------------')
-    print('Now, please enter one or more project repositories to upgrade!')
-    print('-------------------------------------------------------------\n')
+    # print('\n-------------------------------------------------------------')
+    # print('Please enter one or more project repositories to upgrade!')
+    # print('-------------------------------------------------------------\n')
 
     confirm = True
     projects = []
@@ -217,6 +253,14 @@ def upgrade_interactive():
         confirm = prompt(confirm_question())['confirm']
 
     answers['projects'] = projects
+
+    answers = prompt(t_repo_question())
+    t_repo = answers['t_repo']
+
+    answers = {**answers, **prompt(template_question())}
+    template = answers['template']
+
+    answers = {**answers, **prompt(template_version_question())}
     return answers
 
 
