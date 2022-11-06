@@ -2,6 +2,7 @@
 import click
 
 import archctl.github as gh
+from archctl.user_config import p_repo_name_exists, t_repo_exists
 
 confirm = ['yes', 'ye', 'y']
 deny = ['no', 'n']
@@ -109,6 +110,32 @@ def validate_repo_interactive(repo):
     return True
 
 
+def validate_register_repo_interactive(repo):
+
+    # If the repo doesn't exist in GitHub.com
+    if not gh.repo_exists(repo[0], repo[1]):
+        return False
+
+    # If the repo is already registered
+    repo_name = '/'.join(repo)
+    if t_repo_exists(repo_name) or p_repo_name_exists(repo_name):
+        return False
+
+    return True
+
+
+def validate_repos_checkbox(repos):
+    if len(repos) < 1:
+        return False
+
+    if 'Other' in repos:
+        if len(repos) > 1:
+            return False
+        return True
+
+    return True
+
+
 def validate_t_repo_interactive(repo):
     if not gh.repo_exists(repo[0], repo[1]):
         return False
@@ -123,13 +150,15 @@ def validate_t_repo_interactive(repo):
 def validate_repo_name_available_interactive(repo):
     """Ask github API if given repo name is available (Doesn't already exist)"""
 
-    if gh.check_user_auth():
-        if gh.get_repo_info(repo[0], repo[1]) is not None:
-            return False
-        else:
-            return True
-    else:
+    # If user is not logged in
+    if not gh.check_user_auth():
         return False
+
+    # If the given repo already exists in github.com
+    if gh.get_repo_info(repo[0], repo[1]) is not None:
+        return False
+
+    return True
 
 
 def validate_depth_interactive(value):

@@ -175,8 +175,6 @@ def search_templates(owner, repo, ref=None):
         paths = ['/'.join(template['path'].split('/')[:-1]) for template in dirs if '/' in template['path']]
         templates = [template['path'].split('/')[-2] for template in dirs if '/' in template['path']]
 
-    print(dict(zip(templates, paths)))
-
     return dict(zip(templates, paths))
 
 
