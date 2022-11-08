@@ -30,7 +30,7 @@ def list_repo_branches():
     """Returns a list with the names of the branches in the given repo"""
     if repo is not None:
         branches = gh.list_branches(repo)
-        if branches is not None:
+        if branches:
             return branches
         else:
             return []
@@ -44,7 +44,10 @@ def get_available_templates():
     global templates
     templates = gh.search_templates(t_repo)
 
-    return templates
+    if templates:
+        return templates
+    else:
+        return []
 
 
 def get_last_three_v():
@@ -52,7 +55,10 @@ def get_last_three_v():
     global last_three
     path = templates[template]
     commits = gh.get_commit(t_repo, path=path)[:3]
-    last_three = [t_version['sha'][:8] for t_version in commits]
+    if commits:
+        last_three = [t_version['sha'][:8] for t_version in commits]
+    else:
+        last_three = []
     return last_three
 
 

@@ -14,6 +14,7 @@ from archctl.validation import (validate_template_repo, validate_template,
                                 confirm_command_execution, get_default_branch,
                                 infer_kind, validate_kind, validate_local_repo,
                                 validate_not_local_repo)
+import archctl.main as arch
 
 
 def version_msg():
@@ -106,17 +107,18 @@ def register(repo, kind, branch, yes, verbose):
         validate_branch(repo, branch)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
+    if not yes:
         # Just do it
-        print('Yeah')
-    else:
         confirm_command_execution(ctx)
+
+    arch.register(repo, kind, branch)
 
     pass
 
 
 @main.command()
 def list():
+    arch.list()
     pass
 
 
@@ -130,11 +132,10 @@ def delete(repo, yes, verbose):
     validate_local_repo(repo)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(click.get_current_context())
+
+    arch.delete(repo)
 
     pass
 
@@ -159,23 +160,22 @@ def modify(repo, new_repo, branch, kind, yes, verbose):
     validate_not_local_repo(new_repo)
 
     if kind is None:
-        kind = infer_kind(repo)
+        kind = infer_kind(new_repo)
         ctx.params['kind'] = kind
     else:
-        validate_kind(repo, kind)
+        validate_kind(new_repo, kind)
 
     if branch is None and kind == 'Project':
-        branch = get_default_branch(repo)
+        branch = get_default_branch(new_repo)
         ctx.params['branch'] = branch
     elif branch is not None:
-        validate_branch(repo, branch)
+        validate_branch(new_repo, branch)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(ctx)
+
+    arch.modify(repo, new_repo, kind, branch)
 
     pass
 
@@ -195,15 +195,14 @@ def create(cookies, name, template_repo, template, verbose, yes):
 
     validate_repo_name_available(name)
     validate_template_repo(template_repo)
-    validate_template(template_repo, template)
-    validate_cookies(cookies)
+    path = validate_template(template_repo, template)
+    validate_cookies(cookies, yes)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(click.get_current_context())
+
+    arch.create(name, template_repo, template, path, cookies)
 
     pass
 

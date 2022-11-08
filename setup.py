@@ -9,7 +9,8 @@ with open('README.md', encoding='utf-8') as readme_file:
 requirements = [
     'click',
     'InquirerPy',
-    'cookiecutter'
+    'cookiecutter',
+    'GitPython'
 ]
 
 setup(

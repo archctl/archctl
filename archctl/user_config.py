@@ -82,16 +82,16 @@ def set_t_repos(t_repos):
     write_user_config(config)
 
 
-def update_p_repo(p_repo, new_p_repo):
+def update_p_repo(p_repo_id, new_p_repo):
     """Update a project repo"""
 
-    if check_p_repo_format(p_repo, new_p_repo):
-        p_repos = get_p_repos()
-        match = [x for x in p_repos if x == p_repo]
-        if match:
-            p_repos[p_repos.index(p_repo)] = new_p_repo
-            set_p_repos(p_repos)
-            return True
+    p_repos = get_p_repos()
+    match = [x for x in p_repos if x['name'] == p_repo_id]
+
+    if match and check_p_repo_format(match, new_p_repo):
+        p_repos[p_repos.index(match)] = new_p_repo
+        set_p_repos(p_repos)
+        return True
 
     return False
 
@@ -107,6 +107,19 @@ def update_t_repo(t_repo, new_t_repo):
             return True
 
     return False
+
+
+def update_repo(old_repo, new_repo, kind):
+    if kind == 'Project':
+        if p_repo_name_exists(old_repo):
+            return update_p_repo(old_repo, new_repo)
+        else:
+            return delete_t_repo(old_repo) and add_p_repo(new_repo)
+    elif kind == 'Template':
+        if t_repo_exists(old_repo):
+            return update_t_repo(old_repo, new_repo)
+        else:
+            return delete_p_repo(old_repo) and add_t_repo(new_repo)
 
 
 def add_p_repo(p_repo):
@@ -136,13 +149,13 @@ def add_t_repo(t_repo):
     return False
 
 
-def delete_p_repo(p_repo):
+def delete_p_repo(p_repo_id):
     """Delete a project repo"""
 
     p_repos = get_p_repos()
-    match = [x for x in p_repos if x == p_repo]
+    match = [x for x in p_repos if x['name'] == p_repo_id]
     if match:
-        p_repos.remove(p_repo)
+        p_repos.remove(match[0])
         set_p_repos(p_repos)
         return True
 
@@ -159,6 +172,10 @@ def delete_t_repo(t_repo):
         return True
 
     return False
+
+
+def delete_repo(repo):
+    return delete_p_repo(repo) or delete_t_repo(repo)
 
 
 def t_repo_exists(t_repo):

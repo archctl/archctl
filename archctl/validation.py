@@ -106,6 +106,8 @@ def validate_template(t_repo, template):
     if template[0] not in templates:
         raise click.BadParameter(f'Couldn\'t find template ({template}) in repository ({t_repo})')
 
+    return templates[template[0]]
+
 
 def validate_cookies(cookies, yes):
     # Check if the cookies file is a valid one
@@ -165,7 +167,7 @@ def validate_t_repo_interactive(repo):
         return False
 
     templates = gh.search_templates(repo)
-    if templates is None or not templates:
+    if not templates:
         return False
 
     return True
@@ -179,7 +181,7 @@ def validate_repo_name_available_interactive(repo):
         return False
 
     # If the given repo already exists in github.com
-    if gh.get_repo_info(repo) is not None:
+    if gh.get_repo_info(repo):
         return False
 
     return True

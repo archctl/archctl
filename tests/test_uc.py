@@ -20,10 +20,10 @@ t_repo_2 = 'my-other-t'
 
 @pytest.fixture(autouse=True)
 def set_uc():
-    uc.config_path = '/tmp/.archctl'
+    uc.config_path = '/tmp/.archctl/.archctl'
     uc.create_config_file()
     yield
-    os.system('rm /tmp/.archctl')
+    os.system('rm -rf /tmp/.archctl/')
 
 
 def test_add_p():
