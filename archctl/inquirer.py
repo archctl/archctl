@@ -29,8 +29,8 @@ def print_info(message):
 def list_repo_branches():
     """Returns a list with the names of the branches in the given repo"""
     if repo is not None:
-        branches = [branch['name'] for branch in gh.get_branch(repo[0], repo[1])]
-        if branches:
+        branches = gh.list_branches(repo)
+        if branches is not None:
             return branches
         else:
             return []
@@ -42,7 +42,7 @@ def get_available_templates():
     """Sets the global variable paths to contain the paths of all"""
 
     global templates
-    templates = gh.search_templates(t_repo[0], t_repo[1])
+    templates = gh.search_templates(t_repo)
 
     return templates
 
@@ -51,33 +51,9 @@ def get_last_three_v():
     # Get the last three commits for that template through the GitHub API
     global last_three
     path = templates[template]
-    commits = gh.get_commit(t_repo[0], t_repo[1], path=path)[:3]
+    commits = gh.get_commit(t_repo, path=path)[:3]
     last_three = [t_version['sha'][:8] for t_version in commits]
     return last_three
-
-
-# FILTERS
-def parse_repo_name(repo):
-    """Parse user input (repo | owner/repo | URL) to a list of [owner, repo]"""
-
-    if repo == 'Other':
-        return repo
-
-    s_repo = repo.split('/')  # Split the user input with sep '/'
-
-    # User input is a URL
-    if repo.startswith('https://github.com/'):
-        if repo.endswith('/'):
-            s_repo.pop()
-
-        return s_repo[-2:]
-    else:
-        if len(s_repo) == 1:  # User input is repo
-            return [gh.get_logged_user(), repo]
-        elif len(s_repo) == 2:  # User input is owner/repo
-            return s_repo
-        else:  # More than 1 '/' means user error
-            return ''  # Action if repo is not correctly entered
 
 
 def get_t_repos():
@@ -99,7 +75,7 @@ def commands():
             'type': 'list',
             'name': 'command',
             'message': 'What command do you wish to perform?:',
-            'choices': ['register', 'create', 'upgrade', 'preview', 'search', 'version']
+            'choices': ['register', 'list', 'delete', 'modify', 'create', 'upgrade', 'preview', 'search', 'version']
         }
     ]
 
@@ -110,8 +86,7 @@ def repo_question():
             'type': 'input',
             'name': 'repo',
             'message': 'Name of the repository (owner/name or URL):',
-            'filter': parse_repo_name,
-            'validate': lambda res: val.validate_repo_interactive(parse_repo_name(res)),
+            'validate': lambda res: val.validate_repo_interactive(res),
             "invalid_message": "Repository not found in Github.com"
         }
     ]
@@ -123,9 +98,20 @@ def register_repo_question():
             'type': 'input',
             'name': 'repo',
             'message': 'Name of the repository (owner/name or URL):',
-            'filter': parse_repo_name,
-            'validate': lambda res: val.validate_register_repo_interactive(parse_repo_name(res)),
+            'validate': lambda res: val.validate_register_repo_interactive(res),
             "invalid_message": "Repository not found in Github.com or already registered"
+        }
+    ]
+
+
+def modify_repo_question():
+    return [
+        {
+            'type': 'input',
+            'name': 'repo',
+            'message': 'Name of the repository (owner/name) to be modified:',
+            'validate': lambda res: val.validate_local_repo_interactive(res),
+            "invalid_message": "Repository not found in local config"
         }
     ]
 
@@ -150,7 +136,9 @@ def kind_question():
             'type': 'list',
             'name': 'kind',
             'message': 'Kind of repository:',
-            'choices': ['Project', 'Template']
+            'choices': ['Project', 'Template'],
+            'validate': lambda res: val.validate_kind_interactive(repo, res),
+            'invalid_message': 'No templates found in the repository'
         }
     ]
 
@@ -162,8 +150,7 @@ def name_question():
             'name': 'name',
             'message': 'Name of the project that will be created\n'
                     '(If no org is indicated, the repo will be created under the logged user account):',
-            'filter': parse_repo_name,
-            'validate': lambda res: val.validate_repo_name_available_interactive(parse_repo_name(res)),
+            'validate': lambda res: val.validate_repo_name_available_interactive(res),
             "invalid_message": "Repository already exists"
         }
     ]
@@ -175,8 +162,7 @@ def t_repo_question():
             'type': 'input',
             'name': 't_repo',
             'message': 'Name or URL of the Template\'s repository (owner/name or URL):',
-            'filter': parse_repo_name,
-            'validate': lambda res: val.validate_t_repo_interactive(parse_repo_name(res))
+            'validate': lambda res: val.validate_t_repo_interactive(res)
         }
     ]
 
@@ -187,8 +173,7 @@ def t_repo_config_question():
             'type': 'list',
             'name': 't_repo',
             'message': 'Select a Template repo from your config:',
-            'choices': get_t_repos(),
-            'filter': parse_repo_name
+            'choices': get_t_repos()
         }
     ]
 
@@ -310,8 +295,15 @@ def prompt_p_repos_manually():
         continue_ = prompt(confirm_question(another_repo))['confirm']
 
 
-def prompt_p_repos_from_config(selected_p_repos):
-    global p_repos, repo
+def prompt_p_repos_from_config():
+    global p_repos, repo, other
+
+    # Prompt to select which repos of the config user wants to upgrade
+    selected_p_repos = prompt(repos_checkbox_question())['selected_repos']
+
+    if 'Other' in selected_p_repos:
+        selected_p_repos.pop(selected_p_repos.index('Other'))
+        other = True
 
     # Get a list with all the info of the Project repos the user selected
     p_repos = [repo for repo in p_repos if repo['name'] in selected_p_repos]
@@ -327,7 +319,7 @@ def prompt_p_repos_from_config(selected_p_repos):
         print_info('Please select the default branch for each of the selected projects')
 
         for p_repo in p_repos:
-            repo = parse_repo_name(p_repo['name'])
+            repo = p_repo['name']
             new_p_repo = {'name': p_repo['name'], 'def_branch': prompt(branch_question())['branch']}
             p_repos[p_repos.index(p_repo)] = new_p_repo
 
@@ -344,14 +336,12 @@ def prompt_p_repos():
     p_repos = uc.get_p_repos()
 
     if p_repos:  # If there are Project repos stored in the config
-        # Prompt to select which repos of the config user wants to upgrade
-        selected_p_repos = prompt(repos_checkbox_question())['selected_repos']
+        prompt_p_repos_from_config()
 
         # If user selected other
-        if len(selected_p_repos) == 1 and selected_p_repos[0] == 'Other':
+        if other:
             prompt_p_repos_manually()
         else:  # If user didn't select other
-            prompt_p_repos_from_config(selected_p_repos)
             continue_ = prompt(confirm_question(more_repos))['confirm']
             if continue_:
                 prompt_p_repos_manually()
@@ -363,10 +353,30 @@ def prompt_p_repos():
 def register_interactive():
     global repo
 
-    answers = prompt(register_repo_question() + kind_question())
+    answers = prompt(register_repo_question())
     repo = answers['repo']
 
-    return {**answers, **prompt(branch_question())}
+    answers = {**answers, **prompt(kind_question())}
+
+    if answers['kind'] == 'Template':
+        return answers
+    else:
+        return {**answers, **prompt(branch_question())}
+
+
+# DELETE
+def delete_interactive():
+    return prompt(modify_repo_question())
+
+
+# DELETE
+def modify_interactive():
+
+    answers = prompt(modify_repo_question())
+
+    print_info('Now, please enter the infomation to update')
+
+    return {**answers, **register_interactive()}
 
 
 # CREATE
@@ -432,6 +442,13 @@ def interactive_prompt():
 
     if command == "register":
         return register_interactive()
+    elif command == "list":
+        # Call list
+        pass
+    elif command == "delete":
+        return delete_interactive()
+    elif command == "modify":
+        return modify_interactive()
     elif command == "create":
         return create_interactive()
     elif command == "upgrade":

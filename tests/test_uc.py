@@ -4,14 +4,14 @@ import os
 import archctl.user_config as uc
 
 p_repo_1 = {
-            "name": "my-org/my-project-repo",
-            "def_branch": "main"
-        }
+    "name": "my-org/my-project-repo",
+    "def_branch": "main"
+}
 
 p_repo_2 = {
-            "name": "my-org/my-other-project",
-            "def_branch": "develop"
-        }
+    "name": "my-org/my-other-project",
+    "def_branch": "develop"
+}
 
 t_repo_1 = 'my-template-repo'
 
