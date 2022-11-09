@@ -10,7 +10,8 @@ requirements = [
     'click',
     'InquirerPy',
     'cookiecutter',
-    'GitPython'
+    'GitPython',
+    'igittigitt'
 ]
 
 setup(

@@ -3,28 +3,28 @@ from os import access, R_OK, environ
 from os.path import isfile
 import json
 
-config_path = environ['HOME'] + '/.archctl'
+CONFIG_PATH = environ['HOME'] + '/.archctl'
 
-base_config = {'t_repos': [], 'p_repos': []}
+BASE_CONFIG = {'t_repos': [], 'p_repos': []}
 
 
 def user_config_exists():
     """Check if the user config file exists"""
 
-    return isfile(config_path) and access(config_path, R_OK)
+    return isfile(CONFIG_PATH) and access(CONFIG_PATH, R_OK)
 
 
 def read_user_config():
     """Read user config file and return the dictionary"""
 
-    with open(config_path) as json_file:
+    with open(CONFIG_PATH) as json_file:
         return json.load(json_file)
 
 
 def write_user_config(config):
     """Overwrite user config with new config"""
 
-    with open(config_path, 'w') as outfile:
+    with open(CONFIG_PATH, 'w') as outfile:
         json.dump(config, outfile)
 
 
@@ -32,8 +32,8 @@ def create_config_file():
     """Create the user config file if it didn't exist"""
 
     if not user_config_exists():
-        with open(config_path, 'w') as outfile:
-            json.dump(base_config, outfile)
+        with open(CONFIG_PATH, 'w') as outfile:
+            json.dump(BASE_CONFIG, outfile)
 
 
 def check_p_repo_format(*args):
