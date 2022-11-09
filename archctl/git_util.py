@@ -2,7 +2,7 @@ import git
 
 
 def clone_repo(repo, path):
-    return git.Repo.clone_from(f'git@github.com:{repo[0]}/{repo[1]}.git', f'{path}/{repo[1]}')
+    return git.Repo.clone_from(f'git@github.com:{repo[0]}/{repo[1]}.git', path)
 
 
 def git_push_changes(repo, path, message):

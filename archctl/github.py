@@ -2,6 +2,9 @@
 import subprocess
 import requests
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 api_github = "https://api.github.com"
 cookiecutter_dir_pattern = re.compile('^(.*\/)*\{\{cookiecutter\..*\}\}$')
@@ -18,11 +21,13 @@ def set_headers():
 def get_request(request):
     """Makes a get request"""
 
-    response = requests.get(request, headers=set_headers())
+    try:
+        response = requests.get(request, headers=set_headers())
+        response.raise_for_status()
 
-    if response.status_code == 200:
         return response.json()
-    else:
+
+    except requests.exceptions.HTTPError:
         return False
 
 
@@ -53,9 +58,11 @@ def check_user_auth():
 
     try:
         subprocess.run(cmd.split(), capture_output=True, check=True)
+        logger.debug('User is logged in')
         return True
 
     except subprocess.CalledProcessError:
+        logger.error('User is NOT logged in')
         return False
 
 

@@ -36,3 +36,7 @@ def move_dir(src_path, dest_path, ignore_path=None):
         relative_path = '/'.join(file.split('/')[-distance:])
         file_dest_path = dest_path + relative_path
         shutil.move(file, file_dest_path)
+
+
+def exists(path):
+    return pathlib.Path(path).exists()

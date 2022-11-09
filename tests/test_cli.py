@@ -31,12 +31,12 @@ def setup_repo():
 
 @pytest.fixture(scope='session', autouse=True)
 def set_uc():
-    uc.config_path = '/tmp/.archctl'
+    uc.config_path = '/tmp/.archctl/.archctl'
     uc.create_config_file()
     uc.add_p_repo({'name': 'test_p', 'def_branch': 'main'})
     uc.add_t_repo('archctl/test')
     yield
-    os.system('rm /tmp/.archctl')
+    os.system('rm -rf /tmp/.archctl/')
 
 
 @pytest.fixture(params=['-V', '--version'])
