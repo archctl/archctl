@@ -2,6 +2,9 @@
 import subprocess
 import requests
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 api_github = "https://api.github.com"
 cookiecutter_dir_pattern = re.compile('^(.*\/)*\{\{cookiecutter\..*\}\}$')
@@ -18,12 +21,14 @@ def set_headers():
 def get_request(request):
     """Makes a get request"""
 
-    response = requests.get(request, headers=set_headers())
+    try:
+        response = requests.get(request, headers=set_headers())
+        response.raise_for_status()
 
-    if response.status_code == 200:
         return response.json()
-    else:
-        return None
+
+    except requests.exceptions.HTTPError:
+        return False
 
 
 def parse_repo_name(repo):
@@ -43,7 +48,7 @@ def parse_repo_name(repo):
         elif len(s_repo) == 2:  # User input is owner/repo
             return s_repo
         else:  # More than 1 '/' means user error
-            return None  # Action if repo is not correctly entered
+            return False  # Action if repo is not correctly entered
 
 
 def check_user_auth():
@@ -53,9 +58,11 @@ def check_user_auth():
 
     try:
         subprocess.run(cmd.split(), capture_output=True, check=True)
+        logger.debug('User is logged in')
         return True
 
     except subprocess.CalledProcessError:
+        logger.error('User is NOT logged in')
         return False
 
 
@@ -70,7 +77,7 @@ def get_logged_user():
         return user
 
     else:
-        return None
+        return False
 
 
 def get_user_token():
@@ -193,7 +200,7 @@ def create_repo(repo, description='', private='false'):
     if response.status_code == 201:
         return response.json()
     else:
-        return None
+        return False
 
 
 def delete_repo(repo):
@@ -208,7 +215,7 @@ def delete_repo(repo):
     if response.status_code == 204:
         return response.json()
     else:
-        return vars(response)
+        return False
 
 
 def create_dir(repo, path):
@@ -228,7 +235,7 @@ def create_dir(repo, path):
     if response.status_code in [201, 200]:
         return response.json()
     else:
-        return None
+        return False
 
 
 def create_pr(repo, head, base, title='PR created by Archctl'):
@@ -250,7 +257,7 @@ def create_pr(repo, head, base, title='PR created by Archctl'):
     if response.status_code == 201:
         return response.json()
     else:
-        return None
+        return False
 
 
 def has_templates(repo, ref=None):
@@ -260,7 +267,7 @@ def has_templates(repo, ref=None):
     # with the lowest amount of info
     tree = get_tree(repo, ref, '1')
 
-    if tree is None:
+    if not tree:
         return False
 
     for dir in tree['tree']:
@@ -280,8 +287,8 @@ def search_templates(repo, ref=None):
     # with the lowest amount of info
     tree = get_tree(repo, ref, '1')
 
-    if tree is None:
-        return None
+    if not tree:
+        return False
 
     # Get all the directories in the tree that match the cookiecutter project
     # template folder regular expresion --> ^(.*\/)*\{\{cookiecutter\..*\}\}$
@@ -299,7 +306,7 @@ def search_templates(repo, ref=None):
 
 
 def repo_exists(repo):
-    if get_repo_info(repo) is not None:
+    if get_repo_info(repo):
         return True
     else:
         return False

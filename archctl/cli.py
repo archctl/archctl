@@ -14,31 +14,7 @@ from archctl.validation import (validate_template_repo, validate_template,
                                 confirm_command_execution, get_default_branch,
                                 infer_kind, validate_kind, validate_local_repo,
                                 validate_not_local_repo)
-
-
-def version_msg():
-    """Return the Archctl version, location and Python powering it."""
-    location = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    python_version = sys.version
-    return f"Archctl {__version__} from {location} (Python {python_version})"
-
-
-def interactive_callback(ctx, param, value):
-    if value:
-        interactive_prompt()
-        exit(1)
-    else:
-        pass
-
-
-@click.group()
-@click.version_option(__version__, '-V', '--version', message=version_msg())
-@click.option('-I', '--interactive', is_flag=True, default=False, callback=interactive_callback)
-def main(interactive):
-    """Renders the archetype
-    """
-    pass
-
+import archctl.main as arch
 
 common_options = [
     click.option(
@@ -50,13 +26,11 @@ common_options = [
 ]
 
 template_options = [
-    click.option(
-        '-r', '--template-repo', required=True,
-        help='Repo containing the template'
+    click.argument(
+        'template-repo'
     ),
-    click.option(
-        '-t', '--template', required=True,
-        help='Template to use'
+    click.argument(
+        'template'
     )
 ]
 
@@ -67,6 +41,31 @@ def add_options(options):
             func = option(func)
         return func
     return _add_options
+
+
+def version_msg():
+    """Return the Archctl version, location and Python powering it."""
+    location = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    python_version = sys.version
+    return f"Archctl {__version__} from {location} (Python {python_version})"
+
+
+@click.group()
+@click.version_option(__version__, '-V', '--version', message=version_msg())
+def main():
+    """Renders the archetype
+    """
+
+    pass
+
+
+@main.command()
+@click.option('-v', '--verbose', is_flag=True, default=False)
+def it(verbose):
+
+    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+
+    interactive_prompt()
 
 
 @main.command()
@@ -106,22 +105,23 @@ def register(repo, kind, branch, yes, verbose):
         validate_branch(repo, branch)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
+    if not yes:
         # Just do it
-        print('Yeah')
-    else:
         confirm_command_execution(ctx)
+
+    arch.register(repo, kind, branch)
 
     pass
 
 
 @main.command()
 def list():
+    arch.list()
     pass
 
 
 @main.command()
-@click.argument('repo', required=True)
+@click.argument('old-repo', required=True)
 @add_options(common_options)
 def delete(repo, yes, verbose):
 
@@ -130,33 +130,32 @@ def delete(repo, yes, verbose):
     validate_local_repo(repo)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(click.get_current_context())
+
+    arch.delete(repo)
 
     pass
 
 
 @main.command()
+@click.argument('old-repo')
 @click.argument('repo')
-@click.argument('new-repo')
 @click.option('-b', '--branch')
 @click.option(
     '-k', '--kind',
     type=click.Choice(['Project', 'Template'])
 )
 @add_options(common_options)
-def modify(repo, new_repo, branch, kind, yes, verbose):
+def modify(old_repo, repo, branch, kind, yes, verbose):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
     ctx = click.get_current_context()
 
-    validate_local_repo(repo)
-    validate_repo(new_repo)
-    validate_not_local_repo(new_repo)
+    validate_local_repo(old_repo)
+    validate_repo(repo)
+    validate_not_local_repo(repo)
 
     if kind is None:
         kind = infer_kind(repo)
@@ -171,11 +170,10 @@ def modify(repo, new_repo, branch, kind, yes, verbose):
         validate_branch(repo, branch)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(ctx)
+
+    arch.modify(old_repo, repo, kind, branch)
 
     pass
 
@@ -195,15 +193,14 @@ def create(cookies, name, template_repo, template, verbose, yes):
 
     validate_repo_name_available(name)
     validate_template_repo(template_repo)
-    validate_template(template_repo, template)
-    validate_cookies(cookies)
+    path = validate_template(template_repo, template)
+    validate_cookies(cookies, yes)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         confirm_command_execution(click.get_current_context())
+
+    arch.create(name, template_repo, template, path, cookies)
 
     pass
 
@@ -218,7 +215,7 @@ def upgrade(repos, template_repo, template, verbose, yes):
 
     validate_repos(repos)
     validate_template_repo(template_repo)
-    validate_template(template_repo, template)
+    path = validate_template(template_repo, template)
 
     # If running in --yes-all mode, skip any user confirmation
     if yes:
@@ -226,6 +223,9 @@ def upgrade(repos, template_repo, template, verbose, yes):
         print('Yeah')
     else:
         confirm_command_execution(click.get_current_context())
+
+    arch.upgrade(repos, template_repo, template, path, yes)
+
     pass
 
 

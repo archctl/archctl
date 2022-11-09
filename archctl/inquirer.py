@@ -1,23 +1,27 @@
 """Interactive questions for the main CLI commands."""
 
+import logging
+
 from InquirerPy import prompt
 
 import archctl.github as gh
 import archctl.validation as val
 import archctl.user_config as uc
+import archctl.main as arch
+
+logger = logging.getLogger(__name__)
 
 #  GLOBAL VARIABLES
-repo = None
-p_repos = None
-t_repo = None
-t_repos = None
-template = None
-templates = None
-last_three = None
+REPO = None
+PROJECT_REPOS = None
+TEMPLATE_REPO = None
+TEMPLATE_REPOS = None
+TEMPLATE = None
+TEMPLATES = None
 
-another_repo = 'Do you want to add another repo?'
-def_branches = 'Do you want to continue with this configuration?'
-more_repos = 'Do you wish to add more repos manually?'
+ANOTHER_REPO = 'Do you want to add another REPO?'
+DEF_BRANCHES = 'Do you want to continue with this configuration?'
+MORE_REPOS = 'Do you wish to add more repos manually?'
 
 
 def print_info(message):
@@ -27,10 +31,10 @@ def print_info(message):
 
 
 def list_repo_branches():
-    """Returns a list with the names of the branches in the given repo"""
-    if repo is not None:
-        branches = gh.list_branches(repo)
-        if branches is not None:
+    """Returns a list with the names of the branches in the given REPO"""
+    if REPO is not None:
+        branches = gh.list_branches(REPO)
+        if branches:
             return branches
         else:
             return []
@@ -41,31 +45,34 @@ def list_repo_branches():
 def get_available_templates():
     """Sets the global variable paths to contain the paths of all"""
 
-    global templates
-    templates = gh.search_templates(t_repo)
+    global TEMPLATES
+    TEMPLATES = gh.search_templates(TEMPLATE_REPO)
 
-    return templates
+    if TEMPLATES:
+        return TEMPLATES
+    else:
+        return []
 
 
 def get_last_three_v():
-    # Get the last three commits for that template through the GitHub API
-    global last_three
-    path = templates[template]
-    commits = gh.get_commit(t_repo, path=path)[:3]
-    last_three = [t_version['sha'][:8] for t_version in commits]
+    # Get the last three commits for that TEMPLATE through the GitHub API
+    path = TEMPLATES[TEMPLATE]
+    commits = gh.get_commit(TEMPLATE_REPO, path=path)[:3]
+    if commits:
+        last_three = [t_version['sha'][:8] for t_version in commits]
+    else:
+        last_three = []
     return last_three
 
 
 def get_t_repos():
-    t_repos = uc.get_t_repos()
-    t_repos.append('Other')
-    return t_repos
+    return TEMPLATE_REPOS.append('Other')
 
 
 def get_p_repos():
-    p_repos_ = [repo['name'] for repo in p_repos]
-    p_repos_.append('Other')
-    return p_repos_
+    p_repos = [repo['name'] for repo in PROJECT_REPOS]
+    p_repos.append('Other')
+    return p_repos
 
 
 # QUESTIONS
@@ -108,7 +115,7 @@ def modify_repo_question():
     return [
         {
             'type': 'input',
-            'name': 'repo',
+            'name': 'old_repo',
             'message': 'Name of the repository (owner/name) to be modified:',
             'validate': lambda res: val.validate_local_repo_interactive(res),
             "invalid_message": "Repository not found in local config"
@@ -137,8 +144,8 @@ def kind_question():
             'name': 'kind',
             'message': 'Kind of repository:',
             'choices': ['Project', 'Template'],
-            'validate': lambda res: val.validate_kind_interactive(repo, res),
-            'invalid_message': 'No templates found in the repository'
+            'validate': lambda res: val.validate_kind_interactive(REPO, res),
+            'invalid_message': 'No TEMPLATES found in the repository'
         }
     ]
 
@@ -149,7 +156,7 @@ def name_question():
             'type': 'input',
             'name': 'name',
             'message': 'Name of the project that will be created\n'
-                    '(If no org is indicated, the repo will be created under the logged user account):',
+                    '(If no org is indicated, the REPO will be created under the logged user account):',
             'validate': lambda res: val.validate_repo_name_available_interactive(res),
             "invalid_message": "Repository already exists"
         }
@@ -160,7 +167,7 @@ def t_repo_question():
     return [
         {
             'type': 'input',
-            'name': 't_repo',
+            'name': 'template_repo',
             'message': 'Name or URL of the Template\'s repository (owner/name or URL):',
             'validate': lambda res: val.validate_t_repo_interactive(res)
         }
@@ -171,8 +178,8 @@ def t_repo_config_question():
     return [
         {
             'type': 'list',
-            'name': 't_repo',
-            'message': 'Select a Template repo from your config:',
+            'name': 'template_repo',
+            'message': 'Select a Template REPO from your config:',
             'choices': get_t_repos()
         }
     ]
@@ -204,9 +211,9 @@ def template_version_question():
     return [
         {
             'type': 'input',
-            'name': 't_version',
-            'message': ('Version of the template to use. (Last three: ' + str(get_last_three_v()) + '):'),
-            'validate': (lambda t_version: val.validate_t_version_interactive(t_repo, template, t_version))
+            'name': 'template_version',
+            'message': ('Version of the TEMPLATE to use. (Last three: ' + str(get_last_three_v()) + '):'),
+            'validate': (lambda t_version: val.validate_t_version_interactive(TEMPLATE_REPO, TEMPLATE, t_version))
         }
     ]
 
@@ -217,7 +224,7 @@ def search_depth_question():
             'type': 'input',
             'name': 'depth',
             'message': 'Depth of the search for each branch\n(number of'
-                    'commits/versions on each branch on each template) -1 to show all:',
+                    'commits/versions on each branch on each TEMPLATE) -1 to show all:',
             'default': '3',
             'validate': val.validate_depth_interactive
         }
@@ -249,17 +256,17 @@ def confirm_question(message):
 
 # PROMPTS FOR TEMPLATE REPO
 def prompt_t_repo_manually():
-    global t_repo
+    global TEMPLATE_REPO
 
-    t_repo = prompt(t_repo_question())['t_repo']
+    TEMPLATE_REPO = prompt(t_repo_question())['template_repo']
 
 
 def prompt_t_repo_from_config():
-    global t_repo
+    global TEMPLATE_REPO
 
-    t_repo = prompt(t_repo_config_question())['t_repo']
+    TEMPLATE_REPO = prompt(t_repo_config_question())['template_repo']
 
-    if t_repo == 'Other':
+    if TEMPLATE_REPO == 'Other':
         prompt_t_repo_manually()
 
 
@@ -267,61 +274,61 @@ def prompt_t_repo():
     """If there are tempalte repos stored in local config, prompt those
         if there are not, prompt the user to input it manually
     """
-    # Gets all the template repos in local config
+    # Gets all the TEMPLATE repos in local config
     t_repos = uc.get_t_repos()
 
-    if t_repos:  # If there are template repos in local config
+    if t_repos:  # If there are TEMPLATE repos in local config
         prompt_t_repo_from_config()
-    else:  # If there aren't template repos in local config
+    else:  # If there aren't TEMPLATE repos in local config
         prompt_t_repo_manually()
 
 
 # PROMPT FOR PROJECT REPOS
 def prompt_p_repos_manually():
-    global p_repos, repo
+    global PROJECT_REPOS, REPO
 
     print_info('Please enter one or more project repositories to upgrade!\n\t\t\t\t(One by One)')
 
-    # Loop to prompt for a repo and branch, one by one
+    # Loop to prompt for a REPO and branch, one by one
     continue_ = True
     while continue_:
-        # Prompt the repo
-        repo = prompt(repo_question())['repo']
-        # Prompt the branch from the given repo
+        # Prompt the REPO
+        REPO = prompt(repo_question())['repo']
+        # Prompt the branch from the given REPO
         branch = prompt(branch_question())['branch']
-        # Add the given repo and branch to the answer
-        p_repos.append({'name': '/'.join(repo), 'def_branch': branch})
+        # Add the given REPO and branch to the answer
+        PROJECT_REPOS.append({'name': '/'.join(REPO), 'def_branch': branch})
         # Prompt for continuation
-        continue_ = prompt(confirm_question(another_repo))['confirm']
+        continue_ = prompt(confirm_question(ANOTHER_REPO))['confirm']
 
 
 def prompt_p_repos_from_config():
-    global p_repos, repo, other
+    global PROJECT_REPOS, REPO, OTHER
 
     # Prompt to select which repos of the config user wants to upgrade
     selected_p_repos = prompt(repos_checkbox_question())['selected_repos']
 
     if 'Other' in selected_p_repos:
         selected_p_repos.pop(selected_p_repos.index('Other'))
-        other = True
+        OTHER = True
 
     # Get a list with all the info of the Project repos the user selected
-    p_repos = [repo for repo in p_repos if repo['name'] in selected_p_repos]
+    PROJECT_REPOS = [REPO for REPO in PROJECT_REPOS if REPO['name'] in selected_p_repos]
 
     # Prompt user to confirm if he wants to proceed with the stored config or modify it
-    print_info('These are the def branches setup in local config:\n' + str(p_repos))
-    continue_ = prompt(confirm_question(def_branches))['confirm']
+    print_info('These are the def branches setup in local config:\n' + str(PROJECT_REPOS))
+    continue_ = prompt(confirm_question(DEF_BRANCHES))['confirm']
 
-    if not continue_:  # If user says yes, p_repos holds all the info as a global var
+    if not continue_:  # If user says yes, PROJECT_REPOS holds all the info as a global var
 
-        # When user indicates no, question which branch of the repo the user
-        # whishes to use in each repo
+        # When user indicates no, question which branch of the REPO the user
+        # whishes to use in each REPO
         print_info('Please select the default branch for each of the selected projects')
 
-        for p_repo in p_repos:
-            repo = p_repo['name']
+        for p_repo in PROJECT_REPOS:
+            REPO = p_repo['name']
             new_p_repo = {'name': p_repo['name'], 'def_branch': prompt(branch_question())['branch']}
-            p_repos[p_repos.index(p_repo)] = new_p_repo
+            PROJECT_REPOS[PROJECT_REPOS.index(p_repo)] = new_p_repo
 
         # Now, p_repo holds all the info as a global var
 
@@ -330,19 +337,19 @@ def prompt_p_repos():
     """ Prompt user to select the projects to update from local config
         and optionally, add more manually
     """
-    global p_repos
+    global PROJECT_REPOS
 
     # Get the Project Repos stored in the user config
-    p_repos = uc.get_p_repos()
+    PROJECT_REPOS = uc.get_p_repos()
 
-    if p_repos:  # If there are Project repos stored in the config
+    if PROJECT_REPOS:  # If there are Project repos stored in the config
         prompt_p_repos_from_config()
 
         # If user selected other
-        if other:
+        if OTHER:
             prompt_p_repos_manually()
         else:  # If user didn't select other
-            continue_ = prompt(confirm_question(more_repos))['confirm']
+            continue_ = prompt(confirm_question(MORE_REPOS))['confirm']
             if continue_:
                 prompt_p_repos_manually()
     else:  # If there are no Project repos stored in the config
@@ -351,22 +358,24 @@ def prompt_p_repos():
 
 # REGISTER
 def register_interactive():
-    global repo
+    global REPO
 
     answers = prompt(register_repo_question())
-    repo = answers['repo']
+    REPO = answers['repo']
 
     answers = {**answers, **prompt(kind_question())}
 
     if answers['kind'] == 'Template':
-        return answers
+        return {**answers, **{'branch': None}}
     else:
         return {**answers, **prompt(branch_question())}
 
 
 # DELETE
 def delete_interactive():
-    return prompt(modify_repo_question())
+    answers = {}
+    answers['repo_to_delete'] = prompt(modify_repo_question())['old_repo']
+    return answers
 
 
 # DELETE
@@ -381,34 +390,34 @@ def modify_interactive():
 
 # CREATE
 def create_interactive():
-    global template
+    global TEMPLATE
 
     answers = prompt(name_question())
 
     prompt_t_repo()
 
-    answers['t_repo'] = t_repo
+    answers['template_repo'] = TEMPLATE_REPO
 
     answers = {**answers, **prompt(template_question())}
-    template = answers['template']
+    TEMPLATE = answers['template']
 
     return {**answers, **prompt(template_version_question())}
 
 
 # UPGRADE
 def upgrade_interactive():
-    global t_repo, template, repo, p_repos
+    global TEMPLATE
 
     answers = {}
 
     prompt_p_repos()
-    answers['projects'] = p_repos
+    answers['projects'] = PROJECT_REPOS
 
     prompt_t_repo()
-    answers['t_repo'] = t_repo
+    answers['template_repo'] = TEMPLATE_REPO
 
     answers = {**answers, **prompt(template_question())}
-    template = answers['template']
+    TEMPLATE = answers['template']
 
     answers = {**answers, **prompt(template_version_question())}
     return answers
@@ -417,10 +426,10 @@ def upgrade_interactive():
 # SEARCH
 def search_interactive():
 
-    prompt_t_repo()
-
     answers = {}
-    answers['t_repo'] = t_repo
+
+    prompt_t_repo()
+    answers['template_repo'] = TEMPLATE_REPO
 
     return {**answers, **prompt(search_depth_question())}
 
@@ -428,10 +437,10 @@ def search_interactive():
 # VERSION
 def version_interactive():
 
-    prompt_t_repo()
-
     answers = {}
-    answers['t_repo'] = t_repo
+
+    prompt_t_repo()
+    answers['template_repo'] = TEMPLATE_REPO
 
     return {**answers, **prompt(version_depth_question())}
 
@@ -441,16 +450,29 @@ def interactive_prompt():
     command = prompt(commands())['command']
 
     if command == "register":
-        return register_interactive()
+        answers = register_interactive()
+        val.confirm_command_execution_interactive(answers)
+        arch.register(answers['repo'], answers['kind'], answers['branch'])
+
     elif command == "list":
-        # Call list
-        pass
+        arch.list()
+
     elif command == "delete":
-        return delete_interactive()
+        answers = delete_interactive()
+        val.confirm_command_execution_interactive(answers)
+        arch.delete(answers['old_repo'])
+
     elif command == "modify":
-        return modify_interactive()
+        answers = modify_interactive()
+        val.confirm_command_execution_interactive(answers)
+        arch.modify(answers['old_repo'], answers['repo'], answers['kind'], answers['branch'])
+
     elif command == "create":
-        return create_interactive()
+        answers = create_interactive()
+        val.confirm_command_execution_interactive(answers)
+        arch.create(answers['name'], answers['template_repo'], answers['template'],
+                    TEMPLATES[TEMPLATE], False, answers['cookies'])
+
     elif command == "upgrade":
         return upgrade_interactive()
     elif command == "preview":
