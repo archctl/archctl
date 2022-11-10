@@ -102,6 +102,13 @@ def upgrade(repos, t_repo, t, path, yes):
 
         # Clone the repo
         git_repo = git_util.clone_repo(name, repo_path)
+        branch = repo['branch']
+        render_branch = 'render-X'
+
+        # Get the repo ready for the upgrade
+        git_util.checkout(git_repo, branch)
+        git_util.checkout(git_repo, render_branch)
+        git_util.publish_branch(git_repo, render_branch)
 
         # Render the template
         cc(template=template, checkout=t[1], no_input=yes, overwrite_if_exists=True,
@@ -117,5 +124,39 @@ def upgrade(repos, t_repo, t, path, yes):
         # Push the changes
         git_util.git_push_changes(git_repo, f'{repo_path}.', 'Project Update via Archctl')
 
+        # Create a PR in the GH repo
+        gh.create_pr(repo['name'], render_branch, branch, 'Upgrade No X via Archctl')
+
         # Clean up the tmp dir
         os.system('rm -rf /tmp/.archctl/')
+
+
+def preview(repo, t_repo, t, path, yes):
+
+    # Get the variables ready for cookiecutter
+    t_repo = gh.parse_repo_name(t_repo)
+    t = val.parse_template(t)
+    template = f'git@github.com:{t_repo[0]}/{t_repo[1]}.git'
+
+    # Set the working paths
+    name = gh.parse_repo_name(repo['name'])
+    tmp_render = f'{TMP_DIR}render-{name[1]}/'
+    repo_path = f'{TMP_DIR}{name[1]}/'
+    ignore_path = f'{repo_path}.archignore'
+
+    # Clone the repo
+    git_util.clone_repo(name, repo_path)
+
+    # Render the template
+    cc(template=template, checkout=t[1], no_input=yes, overwrite_if_exists=True,
+        output_dir=tmp_render, directory=path)
+
+    # Check if ignore file exists
+    if not util.exists(ignore_path):
+        ignore_path = None
+
+    # Diff non-ignored files to the repo
+    util.diff_dirs(tmp_render, repo_path, ignore_path)
+
+    # Clean up the tmp dir
+    os.system('rm -rf /tmp/.archctl/')
