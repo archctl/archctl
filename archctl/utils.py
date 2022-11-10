@@ -1,5 +1,6 @@
 import pathlib
 import shutil
+from pprint import pprint
 
 import igittigitt
 
@@ -54,3 +55,8 @@ def exists(path):
 #         parser = get_ignore_parser(ignore_path)
 #         files_1 = [file for file in files_1 if not parser.match((file))]
 #         files_2 = [file for file in files_2 if not parser.match((file))]
+
+def print_diff(name, diff):
+    print('-' * 127 + f'\nFile name: {name}')
+    pprint(diff, width=127)
+    print('-' * 127)

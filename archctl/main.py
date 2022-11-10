@@ -10,9 +10,9 @@ from cookiecutter.main import cookiecutter as cc
 
 import archctl.github as gh
 import archctl.user_config as uc
-import archctl.git_util as git_util
+import archctl.git_utils as gu
 import archctl.validation as val
-import archctl.utils as util
+import archctl.utils as utils
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def create(name, t_repo, t, path, yes, cookies=None):
         # Clone the repo locally
         name = gh.parse_repo_name(name)
         repo_path = f'{TMP_DIR}{name[1]}'
-        tmp_repo = git_util.clone_repo(name, repo_path)
+        tmp_repo = gu.clone_repo(name, repo_path)
 
         # Get the variables ready for cookiecutter
         t_repo = gh.parse_repo_name(t_repo)
@@ -79,7 +79,7 @@ def create(name, t_repo, t, path, yes, cookies=None):
             output_dir=repo_path, config_file=cookies, directory=path)
 
         # Push the changes
-        git_util.git_push_changes(tmp_repo, f'{repo_path}/.', 'Project creation and template render with Archctl')
+        gu.push_changes(tmp_repo, f'{repo_path}/.', 'Project creation and template render with Archctl')
 
         # Clean up the tmp dir
         os.system('rm -rf /tmp/.archctl/')
@@ -101,28 +101,28 @@ def upgrade(repos, t_repo, t, path, yes):
         ignore_path = f'{repo_path}.archignore'
 
         # Clone the repo
-        git_repo = git_util.clone_repo(name, repo_path)
+        git_repo = gu.clone_repo(name, repo_path)
         branch = repo['branch']
-        render_branch = 'render-X'
+        render_branch = 'archctl/upgrade-X'
 
         # Get the repo ready for the upgrade
-        git_util.checkout(git_repo, branch)
-        git_util.checkout(git_repo, render_branch)
-        git_util.publish_branch(git_repo, render_branch)
+        gu.checkout(git_repo, branch)
+        gu.checkout(git_repo, render_branch)
+        gu.publish_branch(git_repo, render_branch)
 
         # Render the template
         cc(template=template, checkout=t[1], no_input=yes, overwrite_if_exists=True,
             output_dir=tmp_render, directory=path)
 
         # Check if ignore file exists
-        if not util.exists(ignore_path):
+        if not utils.exists(ignore_path):
             ignore_path = None
 
         # Move non-ignored files to the repo
-        util.move_dir(tmp_render, repo_path, ignore_path)
+        utils.move_dir(tmp_render, repo_path, ignore_path)
 
         # Push the changes
-        git_util.git_push_changes(git_repo, f'{repo_path}.', 'Project Update via Archctl')
+        gu.push_changes(git_repo, f'{repo_path}.', 'Project Update via Archctl')
 
         # Create a PR in the GH repo
         gh.create_pr(repo['name'], render_branch, branch, 'Upgrade No X via Archctl')
@@ -143,20 +143,45 @@ def preview(repo, t_repo, t, path, yes):
     tmp_render = f'{TMP_DIR}render-{name[1]}/'
     repo_path = f'{TMP_DIR}{name[1]}/'
     ignore_path = f'{repo_path}.archignore'
+    branch = repo['branch']
+    render_branch = 'archctl/preview'
 
     # Clone the repo
-    git_util.clone_repo(name, repo_path)
+    git_repo = gu.clone_repo(name, repo_path)
+
+    # Checkout to the existing branch the user specified the checkout from
+    gu.checkout(git_repo, branch)
+    # Checkout to the new local branch where the render will take place
+    gu.checkout(git_repo, render_branch)
 
     # Render the template
     cc(template=template, checkout=t[1], no_input=yes, overwrite_if_exists=True,
         output_dir=tmp_render, directory=path)
 
     # Check if ignore file exists
-    if not util.exists(ignore_path):
+    if not utils.exists(ignore_path):
         ignore_path = None
 
-    # Diff non-ignored files to the repo
-    util.diff_dirs(tmp_render, repo_path, ignore_path)
+    # Move non-ignored files to the repo
+    utils.move_dir(tmp_render, repo_path, ignore_path)
+
+    # Generate diff between current branch (render) and user specified branch
+    diff = gu.diff_branches(repo, branch)
+
+    # Print additions
+    print('Added files:')
+    for addition in diff['A']:
+        utils.print_diff(addition['name'], addition['diff'])
+
+    # Print deletions
+    print('Deleted files:')
+    for addition in diff['D']:
+        print(f'-{name}')
+
+    # Print modifications
+    print('Modified files:')
+    for addition in diff['M']:
+        utils.print_diff(addition['name'], addition['diff'])
 
     # Clean up the tmp dir
     os.system('rm -rf /tmp/.archctl/')
