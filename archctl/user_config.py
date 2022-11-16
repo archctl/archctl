@@ -1,205 +1,174 @@
 """Module to handle the local user config"""
-from os import access, R_OK, environ
-from os.path import isfile
 import json
+from abc import ABC, abstractmethod
+from os import R_OK, access, environ
+from os.path import isfile
 
-CONFIG_PATH = environ['HOME'] + '/.archctl'
-
-BASE_CONFIG = {'t_repos': [], 'p_repos': []}
-
-
-def user_config_exists():
-    """Check if the user config file exists"""
-
-    return isfile(CONFIG_PATH) and access(CONFIG_PATH, R_OK)
+import archctl.commons as comm
 
 
-def read_user_config():
-    """Read user config file and return the dictionary"""
+class UserConfig(ABC):
 
-    with open(CONFIG_PATH) as json_file:
-        return json.load(json_file)
+    @abstractmethod
+    def create_config_file(self):
+        """Create the user config file if it didn't exist"""
+
+    @abstractmethod
+    def project_repos(self):
+        """Get all the Project repos stored in the user config"""
+
+    @abstractmethod
+    def template_repos(self):
+        """Get all the Template repos stored in the user config"""
+
+    @abstractmethod
+    def set_p_repos(self, p_repos: list[comm.Repo]):
+        """Set the project repos"""
+
+    @abstractmethod
+    def set_t_repos(self, t_repos: list[comm.Repo]):
+        """Set the template repos"""
+
+    @abstractmethod
+    def add_p_repo(self, p_repo):
+        """Add a project repo"""
+
+    @abstractmethod
+    def add_t_repo(self, t_repo):
+        """Add a template repo"""
+
+    @abstractmethod
+    def delete_repo(self, repo):
+        """Delete a repo from the user config"""
+
+    @abstractmethod
+    def repo_exists(self, repo):
+        """Check if a repo exists"""
 
 
-def write_user_config(config):
-    """Overwrite user config with new config"""
+class JSONConfig(UserConfig):
 
-    with open(CONFIG_PATH, 'w') as outfile:
-        json.dump(config, outfile)
+    __CONFIG_PATH = environ['HOME'] + '/.archctl'
+    __BASE_CONFIG = {'t_repos': [], 'p_repos': []}
 
+    def __user_config_exists(self):
+        """Check if the user config file exists"""
+        return isfile(self.__CONFIG_PATH) and access(self.__CONFIG_PATH, R_OK)
 
-def create_config_file():
-    """Create the user config file if it didn't exist"""
-
-    if not user_config_exists():
-        with open(CONFIG_PATH, 'w') as outfile:
-            json.dump(BASE_CONFIG, outfile)
-
-
-def check_p_repo_format(*args):
-    """Check if p_repo has the correct format (Dict with name and def_branch keys)"""
-
-    for p_repo in args:
-        if not ('name' in p_repo and 'def_branch' in p_repo and isinstance(p_repo, dict)):
+    def __read_user_config(self):
+        """Read user config file and return the dictionary"""
+        if not self.__user_config_exists():
             return False
+        try:
+            with open(self.__CONFIG_PATH) as json_file:
+                return json.load(json_file)
+        except json.decoder.JSONDecodeError:
+            self.create_config_file()
+            return {'t_repos': [], 'p_repos': []}
 
-    return True
+    def __write_user_config(self, config):
+        """Overwrite user config with new config"""
+        with open(self.__CONFIG_PATH, 'w') as outfile:
+            json.dump(config, outfile)
 
+    def create_config_file(self):
+        """Create the user config file if it didn't exist"""
+        self.__write_user_config(self.__BASE_CONFIG)
 
-def check_t_repo_format(*args):
-    """Check if t_repo has the correct format (String)"""
+    def project_repos(self) -> list[comm.Repo]:
+        """Get all the Project repos stored in the user config"""
+        config = self.__read_user_config()
+        return [comm.Repo(**repo) for repo in config['p_repos']]
 
-    for t_repo in args:
-        if not isinstance(t_repo, str):
-            return False
+    def template_repos(self) -> list[comm.Repo]:
+        """Get all the Template repos stored in the user config"""
+        config = self.__read_user_config()
+        return [comm.Repo(**repo) for repo in config['t_repos']]
 
-    return True
+    def set_p_repos(self, p_repos: list[comm.Repo]):
+        """Set the project repos"""
+        config = self.__read_user_config()
+        config['p_repos'] = json.loads(json.dumps(p_repos, cls=comm.EnhancedJSONEncoder))
+        self.__write_user_config(config)
 
+    def set_t_repos(self, t_repos: list[comm.Repo]):
+        """Set the template repos"""
+        config = self.__read_user_config()
+        config['t_repos'] = json.loads(json.dumps(t_repos, cls=comm.EnhancedJSONEncoder))
+        self.__write_user_config(config)
 
-def get_p_repos():
-    """Get all the Project repos stored in the user config"""
-    return read_user_config()['p_repos']
+    def add_p_repo(self, p_repo):
+        """Add a project repo"""
 
+        p_repo = comm.get_repo_dataclass(p_repo)
+        p_repos = self.project_repos()
 
-def get_t_repos():
-    """Get all the Template repos stored in the user config"""
-    return read_user_config()['t_repos']
-
-
-def set_p_repos(p_repos):
-    """Set the project repos"""
-
-    config = read_user_config()
-    config['p_repos'] = p_repos
-    write_user_config(config)
-
-
-def set_t_repos(t_repos):
-    """Set the template repos"""
-
-    config = read_user_config()
-    config['t_repos'] = t_repos
-    write_user_config(config)
-
-
-def update_p_repo(p_repo_id, new_p_repo):
-    """Update a project repo"""
-
-    p_repos = get_p_repos()
-    match = [x for x in p_repos if x['name'] == p_repo_id]
-
-    if match and check_p_repo_format(match, new_p_repo):
-        p_repos[p_repos.index(match)] = new_p_repo
-        set_p_repos(p_repos)
-        return True
-
-    return False
-
-
-def update_t_repo(t_repo, new_t_repo):
-    """Update a template repo"""
-
-    if check_t_repo_format(t_repo, new_t_repo):
-        t_repos = get_t_repos()
-        if t_repo in t_repos:
-            t_repos[t_repos.index(t_repo)] = new_t_repo
-            set_t_repos(t_repos)
-            return True
-
-    return False
-
-
-def update_repo(old_repo, new_repo, kind):
-    if kind == 'Project':
-        if p_repo_name_exists(old_repo):
-            return update_p_repo(old_repo, new_repo)
+        if p_repos:
+            match = [r for r in p_repos if r.full_name == p_repo.full_name]
         else:
-            return delete_t_repo(old_repo) and add_p_repo(new_repo)
-    elif kind == 'Template':
-        if t_repo_exists(old_repo):
-            return update_t_repo(old_repo, new_repo)
-        else:
-            return delete_p_repo(old_repo) and add_t_repo(new_repo)
+            match = False
+            p_repos = []
 
-
-def add_p_repo(p_repo):
-    """Add a project repo"""
-
-    if check_p_repo_format(p_repo):
-        p_repos = get_p_repos()
-        match = [x for x in p_repos if x == p_repo]
         if not match:
             p_repos.append(p_repo)
-            set_p_repos(p_repos)
+            self.set_p_repos(p_repos)
             return True
 
-    return False
+        return False
 
+    def add_t_repo(self, t_repo):
+        """Add a template repo"""
 
-def add_t_repo(t_repo):
-    """Add a template repo"""
+        t_repo = comm.get_repo_dataclass(t_repo)
+        t_repos = self.template_repos()
 
-    if check_t_repo_format(t_repo):
-        t_repos = get_t_repos()
-        if t_repo not in t_repos:
+        if t_repos:
+            match = [r for r in t_repos if r.full_name == t_repo.full_name]
+        else:
+            match = False
+            t_repos = []
+
+        if not match:
             t_repos.append(t_repo)
-            set_t_repos(t_repos)
+            self.set_t_repos(t_repos)
             return True
 
-    return False
-
-
-def delete_p_repo(p_repo_id):
-    """Delete a project repo"""
-
-    p_repos = get_p_repos()
-    match = [x for x in p_repos if x['name'] == p_repo_id]
-    if match:
-        p_repos.remove(match[0])
-        set_p_repos(p_repos)
-        return True
-
-    return False
-
-
-def delete_t_repo(t_repo):
-    """Delete a template repo"""
-
-    t_repos = get_t_repos()
-    if t_repo in t_repos:
-        t_repos.remove(t_repo)
-        set_t_repos(t_repos)
-        return True
-
-    return False
-
-
-def delete_repo(repo):
-    return delete_p_repo(repo) or delete_t_repo(repo)
-
-
-def t_repo_exists(t_repo):
-    t_repos = get_t_repos()
-
-    if t_repo in t_repos:
-        return True
-    else:
         return False
 
+    def delete_repo(self, repo):
+        repo = comm.get_repo_dataclass(repo)
 
-def p_repo_name_exists(p_repo_name):
-    p_repos = [p_repo['name'] for p_repo in get_p_repos()]
+        p_repos = self.project_repos()
+        t_repos = self.template_repos()
 
-    if p_repo_name in p_repos:
-        return True
-    else:
+        match_p = [r for r in p_repos if r.full_name == repo.full_name]
+        match_t = [r for r in t_repos if r.full_name == repo.full_name]
+
+        if match_p:
+            p_repos.remove(match_p[0])
+            self.set_p_repos(p_repos)
+            return True
+        elif match_t:
+            t_repos.remove(match_t[0])
+            self.set_t_repos(t_repos)
+            return True
+
         return False
 
+    def repo_exists(self, repo):
+        repo = comm.get_repo_dataclass(repo)
 
-def p_repo_exists(p_repo):
-    p_repos = get_p_repos()
+        p_repos = self.project_repos()
+        t_repos = self.template_repos()
 
-    if p_repo in p_repos:
-        return True
-    else:
-        return False
+        if p_repos:
+            p_repos = [r for r in p_repos if r.full_name == repo.full_name]
+        else:
+            p_repos = False
+
+        if t_repos:
+            t_repos = [r for r in t_repos if r.full_name == repo.full_name]
+        else:
+            t_repos = False
+
+        return p_repos or t_repos

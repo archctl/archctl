@@ -7,14 +7,12 @@ import click
 from archctl import __version__
 from archctl.logger import setup_logger
 from archctl.inquirer import interactive_prompt
-from archctl.validation import (validate_template_repo, validate_template,
-                                validate_repo, validate_branch,
-                                validate_repo_name_available, validate_cookies,
-                                validate_repos, validate_depth,
-                                confirm_command_execution, get_default_branch,
-                                infer_kind, validate_kind, validate_local_repo,
-                                validate_not_local_repo)
-import archctl.main as arch
+from archctl.validation import CLIValidation
+from archctl.github import GHCli
+import archctl.utils as util
+from archctl.main import Archctl
+import archctl.commons as comm
+
 
 common_options = [
     click.option(
@@ -56,8 +54,6 @@ def main():
     """Renders the archetype
     """
 
-    pass
-
 
 @main.command()
 @click.option('-v', '--verbose', is_flag=True, default=False)
@@ -87,95 +83,65 @@ def register(repo, kind, branch, yes, verbose):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
+    repo = comm.get_repo_dataclass(repo)
+
+    cli = GHCli()
+    cli.cw_repo = repo
+
+    validator = CLIValidation()
+
     ctx = click.get_current_context()
 
-    validate_repo(repo)
-    validate_not_local_repo(repo)
+    validator.repo_exists_gh(repo)
+    validator.repo_exists_uc(repo, False)
 
     if kind is None:
-        kind = infer_kind(repo)
+        if util.has_templates(repo):
+            kind = 'Template'
+        else:
+            kind = 'Project'
         ctx.params['kind'] = kind
     else:
-        validate_kind(repo, kind)
+        validator.kind(repo, kind)
 
-    if branch is None and kind == 'Project':
-        branch = get_default_branch(repo)
+    if branch is None:
+        branch = cli.get_repo_info()['default_branch']
         ctx.params['branch'] = branch
-    elif branch is not None:
-        validate_branch(repo, branch)
+        repo.def_ref = branch
+    else:
+        validator.branch_exists_in_repo(repo, branch)
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
         # Just do it
-        confirm_command_execution(ctx)
+        validator.confirm_command_execution(ctx)
 
-    arch.register(repo, kind, branch)
-
-    pass
+    Archctl().register(repo, kind)
 
 
 @main.command()
 def list():
-    arch.list()
-    pass
+    Archctl().list()
 
 
 @main.command()
-@click.argument('old-repo', required=True)
+@click.argument('repo', required=True)
 @add_options(common_options)
 def delete(repo, yes, verbose):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_local_repo(repo)
+    validator = CLIValidation()
+
+    repo = comm.get_repo_dataclass(repo)
+
+    validator.repo_exists_uc(repo)
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
-        confirm_command_execution(click.get_current_context())
+        validator.confirm_command_execution(click.get_current_context())
 
-    arch.delete(repo)
-
-    pass
-
-
-@main.command()
-@click.argument('old-repo')
-@click.argument('repo')
-@click.option('-b', '--branch')
-@click.option(
-    '-k', '--kind',
-    type=click.Choice(['Project', 'Template'])
-)
-@add_options(common_options)
-def modify(old_repo, repo, branch, kind, yes, verbose):
-
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
-
-    ctx = click.get_current_context()
-
-    validate_local_repo(old_repo)
-    validate_repo(repo)
-    validate_not_local_repo(repo)
-
-    if kind is None:
-        kind = infer_kind(repo)
-        ctx.params['kind'] = kind
-    else:
-        validate_kind(repo, kind)
-
-    if branch is None and kind == 'Project':
-        branch = get_default_branch(repo)
-        ctx.params['branch'] = branch
-    elif branch is not None:
-        validate_branch(repo, branch)
-
-    # If running in --yes-all mode, skip any user confirmation
-    if not yes:
-        confirm_command_execution(ctx)
-
-    arch.modify(old_repo, repo, kind, branch)
-
-    pass
+    Archctl().delete(repo)
 
 
 @main.command()
@@ -191,18 +157,20 @@ def create(cookies, name, template_repo, template, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_repo_name_available(name)
-    validate_template_repo(template_repo)
-    path = validate_template(template_repo, template)
-    validate_cookies(cookies, yes)
+    validator = CLIValidation()
+
+    template = comm.get_template_dataclass(template, template_repo)
+    repo = comm.get_repo_dataclass(name)
+
+    validator.repo_exists_gh(repo)
+    validator.template(template)
+    validator.cookies(cookies, yes)
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
-        confirm_command_execution(click.get_current_context())
+        validator.confirm_command_execution(click.get_current_context())
 
-    arch.create(name, template_repo, template, path, cookies)
-
-    pass
+    Archctl().create(repo, template, yes, cookies)
 
 
 @main.command()
@@ -213,20 +181,21 @@ def upgrade(repos, template_repo, template, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_repos(repos)
-    validate_template_repo(template_repo)
-    path = validate_template(template_repo, template)
+    validator = CLIValidation()
+
+    repos = [comm.get_repo_dataclass(repo) for repo in repos if validator.repo_exists_gh(repo)]
+    template = comm.get_template_dataclass(template, template_repo)
+
+    validator.template(template)
 
     # If running in --yes-all mode, skip any user confirmation
     if yes:
         # Just do it
         print('Yeah')
     else:
-        confirm_command_execution(click.get_current_context())
+        validator.confirm_command_execution(click.get_current_context())
 
-    arch.upgrade(repos, template_repo, template, path, yes)
-
-    pass
+    Archctl().upgrade(repos, template, yes)
 
 
 @main.command()
@@ -237,17 +206,19 @@ def preview(repo, template, template_repo, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_repo(repo)
-    validate_template_repo(template_repo)
-    validate_template(template_repo, template)
+    validator = CLIValidation()
+
+    repo = comm.get_repo_dataclass(repo)
+    template = comm.get_template_dataclass(template, template_repo)
+
+    validator.repo_exists_gh(repo)
+    validator.template(template)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
-        confirm_command_execution(click.get_current_context())
-    pass
+    if not yes:
+        validator.confirm_command_execution(click.get_current_context())
+
+    Archctl().preview(repo, template, yes)
 
 
 @main.command()
@@ -261,16 +232,21 @@ def search(repo, depth, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_template_repo(repo)
-    validate_depth(depth)
+    validator = CLIValidation()
+
+    repo = comm.get_repo_dataclass(repo)
+
+    validator.repo_exists_gh(repo)
+    validator.depth(depth)
 
     # If running in --yes-all mode, skip any user confirmation
     if yes:
         # Just do it
         print('Yeah')
     else:
-        confirm_command_execution(click.get_current_context())
-    pass
+        validator.confirm_command_execution(click.get_current_context())
+
+    Archctl().search(repo, depth)
 
 
 @main.command()
@@ -284,16 +260,21 @@ def version(repo, depth, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
-    validate_repo(repo)
-    validate_depth(depth)
+    validator = CLIValidation()
+
+    repo = comm.get_repo_dataclass(repo)
+
+    validator.repo_exists_gh(repo)
+    validator.depth(depth)
 
     # If running in --yes-all mode, skip any user confirmation
     if yes:
         # Just do it
         print('Yeah')
     else:
-        confirm_command_execution(click.get_current_context())
-    pass
+        validator.confirm_command_execution(click.get_current_context())
+
+    Archctl().search(repo, depth)
 
 
 if __name__ == "__main__":

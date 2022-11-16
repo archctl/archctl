@@ -1,10 +1,13 @@
-import git
-from pathlib import Path
 from difflib import Differ
+from pathlib import Path
+
+import git
+
+import archctl.commons as comm
 
 
-def clone_repo(repo, path):
-    return git.Repo.clone_from(f'git@github.com:{repo[0]}/{repo[1]}.git', path)
+def clone_repo(repo: comm.Repo, path):
+    return git.Repo.clone_from(repo.ssh_url, path)
 
 
 def push_changes(repo, path, message):
