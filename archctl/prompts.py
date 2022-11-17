@@ -1,26 +1,25 @@
 from InquirerPy import inquirer
-from archctl.validation import InteractiveValidation
+from archctl.validation import Validation
 from abc import ABC, abstractmethod
 import archctl.commons as comm
-from dataclasses import dataclass
+from InquirerPy.base.control import Choice
 
-
-@dataclass
-class Checks:
-    exists_gh: bool
-    exists_uc: bool
+QUESTIONS = {
+    'command_list': 'Select the command you wish to perform',
+    'repo_text': 'Name of the repository (owner/name or URL)',
+    'repo_list': 'Select a repository from the list',
+    'repo_checkbox': 'Check the repos you want to select',
+    'kind_list': 'Select the kind of repository from the list',
+    'branch_text': 'Name of the branch',
+    'branch_list': 'Select the repo\'s branch',
+    'template_list': 'Select the name of template',
+    'template_version_text': 'Version of the template to use',
+    'ref_list': 'Please select a ref from the list',
+    'confirm': 'Do you wish to proceed'
+}
 
 
 class ArchctlPrompt(ABC):
-    QUESTIONS = {
-        'repo_text': 'Name of the repository (owner/name or URL)',
-        'repo_list': 'Select a repository from the list',
-        'kind_list': 'Select the kind of repository from the list',
-        'branch_text': 'Name of the branch',
-        'branch_list': 'Select the repo\'s branch',
-        'template_list': 'Select the name of template',
-        'template_version_text': 'Version of the template to use'
-    }
 
     @abstractmethod
     def repo_text(self):
@@ -28,6 +27,10 @@ class ArchctlPrompt(ABC):
 
     @abstractmethod
     def repo_list(self, choices):
+        raise NotImplementedError
+
+    @abstractmethod
+    def repo_checkbox(self, choices):
         raise NotImplementedError
 
     @abstractmethod
@@ -46,44 +49,89 @@ class ArchctlPrompt(ABC):
     def template_list(self, choices):
         raise NotImplementedError
 
+    @abstractmethod
+    def ref_list(self, choices):
+        raise NotImplementedError
+
 
 class IPPrompt(ArchctlPrompt):
 
     def __init__(self):
-        self.validator = InteractiveValidation()
+        self.validator = Validation(True)
 
-    def __val_reg_repo(self, input):
+    def __val_reg_repo(self, input, checks: list[bool, bool]):
         input = comm.get_repo_dataclass(input)
-        return (self.validator.repo_exists_gh(input) and self.validator.repo_exists_uc(input, False))
+        if -1 not in checks:
+            gh = bool(checks[0])
+            uc = bool(checks[1])
+            return (self.validator.repo_exists_gh(input, gh) and self.validator.repo_exists_uc(input, uc))
+        elif checks[0] != -1:
+            return self.validator.repo_exists_gh(input, bool(checks[0]))
+        elif checks[1] != -1:
+            return self.validator.repo_exists_uc(input, bool(checks[1]))
+        else:
+            return True
 
-    def repo_text(self):
+    def command_list(self, choices):
+        return inquirer.select(
+            message=QUESTIONS['command_list'],
+            choices=choices
+        ).execute()
+
+    def repo_text(self, checks):
         return inquirer.text(
-            message=super().QUESTIONS['repo_text'],
-            validate=self.__val_reg_repo
+            message=QUESTIONS['repo_text'],
+            validate=lambda repo: self.__val_reg_repo(repo, checks),
+            invalid_message='Problem found with the given repo'
         ).execute()
 
     def kind_list(self, repo):
         return inquirer.select(
-            message=super().QUESTIONS['kind_list'],
+            message=QUESTIONS['kind_list'],
             choices=['Template', 'Project'],
             validate=lambda kind: self.validator.kind(repo, kind),
             invalid_message='Given repo doesn\'t contain any Cookiecutter Templates'
         ).execute()
 
-    def branch_text(self, choices):
-        raise NotImplementedError
+    def branch_text(self, repo):
+        return inquirer.text(
+            message=QUESTIONS['repo_text'],
+            validate=lambda branch: self.validator.branch_exists_in_repo(repo, branch),
+            invalid_message='Branch not found in the given repo'
+        ).execute()
 
     def branch_list(self, choices):
         return inquirer.select(
-            message=super().QUESTIONS['branch_list'],
+            message=QUESTIONS['branch_list'],
             choices=choices
         ).execute()
 
     def repo_list(self, choices):
         return inquirer.select(
-            message=super().QUESTIONS['repo_list'],
+            message=QUESTIONS['repo_list'],
             choices=choices
         ).execute()
 
+    def repo_checkbox(self, choices):
+        return inquirer.checkbox(
+            message=QUESTIONS['repo_list'],
+            choices=choices + [Choice(value='Other')]
+        ).execute()
+
     def template_list(self, choices):
-        raise NotImplementedError
+        return inquirer.select(
+            message=QUESTIONS['template_list'],
+            choices=choices
+        ).execute()
+
+    def ref_list(self, choices):
+        return inquirer.select(
+            message=QUESTIONS['ref_list'],
+            choices=choices
+        ).execute()
+
+    def confirm(self):
+        return inquirer.confirm(
+            message=QUESTIONS['confirm'],
+            default=True
+        ).execute()

@@ -92,7 +92,7 @@ class GHCli(GithubIface):
         elif isinstance(input_repo, comm.Repo):
             self._cw_repo: comm.Repo = input_repo
         else:
-            logger.error('Formato de repo no reconocido al establecer el cw_repo de GHCli')
+            logger.debug('Formato de repo no reconocido al establecer el cw_repo de GHCli')
 
     def __get_request(self, request):
         """Makes a get request via gh cli"""
@@ -105,11 +105,11 @@ class GHCli(GithubIface):
             return json.loads(response)
 
         except subprocess.CalledProcessError:
-            logger.error('Problem running the GitHub CLI command')
+            logger.debug('Problem running the GitHub CLI command')
             return False
 
         except ValueError:
-            logger.error('Problem decoding GitHub API response')
+            logger.debug('Problem decoding GitHub API response')
             return False
 
     def get_repo_info(self):
@@ -178,8 +178,10 @@ class GHCli(GithubIface):
             if not subprocess.getoutput(cmd).startswith('https://'):
                 raise subprocess.CalledProcessError(1, cmd)
 
+            return True
+
         except subprocess.CalledProcessError:
-            logger.error('Could not create the repo')
+            logger.debug('Could not create the repo')
             return False
 
     def create_dir(self, path, commit_message='Commit via Archctl', content='', branch=None):
@@ -209,11 +211,11 @@ class GHCli(GithubIface):
             print(output)
 
         except subprocess.CalledProcessError:
-            logger.error('Problem running the GitHub CLI command')
+            logger.debug('Problem running the GitHub CLI command')
             return False
 
         except ValueError:
-            logger.error('Problem decoding GitHub API response')
+            logger.debug('Problem decoding GitHub API response')
             return False
 
     def delete_repo(self, confirm=True):
@@ -229,7 +231,7 @@ class GHCli(GithubIface):
                 raise subprocess.CalledProcessError(1, cmd)
 
         except subprocess.CalledProcessError:
-            logger.error('Could not delete the repo')
+            logger.debug('Could not delete the repo')
             return False
 
     def create_pr(self, head, base, title='PR created by Archctl'):
@@ -246,5 +248,5 @@ class GHCli(GithubIface):
             print(subprocess.getoutput(cmd))
 
         except subprocess.CalledProcessError:
-            logger.error('Could not delete the repo')
+            logger.debug('Could not delete the repo')
             return False

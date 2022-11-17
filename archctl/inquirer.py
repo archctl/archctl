@@ -1,31 +1,5 @@
 """Interactive questions for the main CLI commands."""
 
-import logging
-
-from InquirerPy import prompt
-
-# import archctl.commons as comm
-# import archctl.main as arch
-# import archctl.user_config as uc
-# import archctl.utils as util
-# import archctl.validation as val
-# from archctl.github import GHCli
-import archctl.commands as cmd
-
-logger = logging.getLogger(__name__)
-
-
-COMMANDS = {
-    'register': cmd.Register(),
-    'list': cmd.List(),
-    'delete': cmd.Delete(),
-    'create': cmd.Create(),
-    # 'upgrade': cmd.Upgrade(),
-    # 'preview': cmd.Preview(),
-    # 'search': cmd.Search(),
-    # 'version': cmd.Version()
-}
-
 # #  GLOBAL VARIABLES
 # REPO = None
 # PROJECT_REPOS = None
@@ -540,12 +514,3 @@ def commands():
 #     answers['template_repo'] = TEMPLATE_REPO
 
 #     return {**answers, **prompt(version_depth_question())}
-
-
-def interactive_prompt():
-
-    command = prompt(commands())['command']
-
-    com = COMMANDS[command]
-
-    com.run()

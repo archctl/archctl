@@ -131,9 +131,8 @@ def get_template_dataclass(input_template: str, input_template_repo: str) -> Tem
 
     template = s_template[0]
     template_repo = get_repo_dataclass(input_template_repo)
-    template_path = None
 
-    return Template(template, template_repo, template_path, template_version)
+    return Template(template, template_repo, None, template_version)
 
 
 def auth_status():

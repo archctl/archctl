@@ -1,7 +1,6 @@
 """Set of validation functions for CLI and Interactive"""
 import click
 import logging
-from abc import ABC, abstractmethod
 
 from archctl.github import GHCli
 from archctl.user_config import JSONConfig
@@ -14,11 +13,12 @@ CONFIRM = ['yes', 'ye', 'y']
 DENY = ['no', 'n']
 
 
-class Validation(ABC):
+class Validation():
 
-    def __init__(self):
+    def __init__(self, interactive: bool = False):
         self.cli = GHCli()
         self.uc = JSONConfig()
+        self.interactive = interactive
 
     def ask_confirmation(self, msg):
         click.echo(msg)
@@ -33,16 +33,11 @@ class Validation(ABC):
 
         return True
 
-    @abstractmethod
-    def confirm_command_execution(self, arg):
-        """Returns a list of the """
-        raise NotImplementedError
-
     def repo_exists_gh(self, repo, exists: bool = True):
         """Given [repo, exists]"""
         self.cli.cw_repo = repo
         if exists != bool(self.cli.get_repo_info()):
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 if exists:
@@ -55,7 +50,7 @@ class Validation(ABC):
     def repo_exists_uc(self, repo, exists: bool = True):
         """Returns a list of the """
         if exists != bool(self.uc.repo_exists(repo)):
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 if exists:
@@ -68,7 +63,7 @@ class Validation(ABC):
     def template(self, t: comm.Template):
         """Returns a list of the """
         if t.template not in util.search_templates(t.template_repo, t.template_version.ref):
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 raise click.BadParameter('Template not found in the given repo')
@@ -79,7 +74,7 @@ class Validation(ABC):
         """Returns a list of the """
         self.cli.cw_repo = repo
         if branch not in [b['name'] for b in self.cli.list_branches()]:
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 raise click.BadParameter('Branch doesn\'t exist in the repo')
@@ -89,7 +84,7 @@ class Validation(ABC):
     def kind(self, repo, kind):
         """Returns a list of the """
         if kind == 'Template' and not util.has_templates(repo):
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 raise click.BadParameter('No Cookiecutter templates found in repo')
@@ -99,41 +94,54 @@ class Validation(ABC):
     def depth(self, depth):
         """Returns a list of the """
         if depth <= 0 and not depth == -1:
-            if isinstance(self, InteractiveValidation):
+            if self.interactive:
                 return False
             else:
                 raise click.BadParameter('Depth must be a number higher than 0')
 
         return True
 
-
-class CLIValidation(Validation):
-
-    def confirm_command_execution(self, ctx):
-        mssg = '\nThese are the values the command will be called with:\n'
-
-        for name, value in ctx.params.items():
-            param = next(param for param in ctx.to_info_dict()['command']['params'] if param["name"] == name)
-            mssg += '\n\t' + str(param['opts']) + ': ' + str(value)
-
-        logger.info(mssg)
-
-        super().ask_confirmation('')
-
     def cookies(self, cookies, yes):
         # Check if the cookies file is a valid one
         if yes and cookies is None:
-            raise click.BadParameter('When running in --yes-all mode, cookies are mandatory')
+            if self.interactive:
+                return False
+            else:
+                raise click.BadParameter('When running in --yes-all mode, cookies are mandatory')
 
-
-class InteractiveValidation(Validation):
-
-    def confirm_command_execution(self, answers):
+    def confirm_command_execution(self, **kwargs):
         mssg = '\nThese are the values the command will be called with:\n'
-        for key, val in {k: v for k, v in answers.items() if v is not None}.items():
+        for key, val in kwargs.items():
             key = ' '.join(key.split('_')).title()
             mssg += f'\n\t- {key}: {val}'
 
         logger.info(mssg)
 
-        super().ask_confirmation('')
+        self.ask_confirmation('')
+
+
+# class CLIValidation(Validation):
+
+    # def confirm_command_execution(self, ctx):
+    #     mssg = '\nThese are the values the command will be called with:\n'
+
+    #     for name, value in ctx.params.items():
+    #         param = next(param for param in ctx.to_info_dict()['command']['params'] if param["name"] == name)
+    #         mssg += '\n\t' + str(param['opts']) + ': ' + str(value)
+
+    #     logger.info(mssg)
+
+    #     super().ask_confirmation('')
+
+
+# class InteractiveValidation(Validation):
+
+    # def confirm_command_execution(self, answers):
+    #     mssg = '\nThese are the values the command will be called with:\n'
+    #     for key, val in {k: v for k, v in answers.items() if v is not None}.items():
+    #         key = ' '.join(key.split('_')).title()
+    #         mssg += f'\n\t- {key}: {val}'
+
+    #     logger.info(mssg)
+
+    #     super().ask_confirmation('')
