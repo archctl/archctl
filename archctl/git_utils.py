@@ -1,4 +1,4 @@
-from difflib import Differ
+import difflib
 from pathlib import Path
 
 import git
@@ -10,9 +10,13 @@ def clone_repo(repo: comm.Repo, path):
     return git.Repo.clone_from(repo.ssh_url, path)
 
 
-def push_changes(repo, path, message):
+def commit_changes(repo, path, message):
     repo.git.add(path)
     repo.index.commit(message)
+
+
+def push_changes(repo, path, message):
+    commit_changes(repo, path, message)
     repo.git.push()
 
 
@@ -43,7 +47,7 @@ def diff_branches(repo, branch):
     diff_index = commit_origin_dev.diff(commit_feature)
 
     # Differ for generating the diff strings
-    differ = Differ()
+    differ = difflib.Differ()
 
     # Collection all new files
     added = []
@@ -79,7 +83,9 @@ def diff_branches(repo, branch):
         # Get the name of the file
         name = Path(diff.b_path).name
 
-        difference = list(differ.compare(a_content, b_content))
+        difference = difflib.context_diff(a_content, b_content, Path(diff.a_path).name, Path(diff.b_path).name)
+
+        #difference = [line for line in list(differ.compare(a_content, b_content)) if (line.startswith('+') or line.startswith('-'))]
 
         modified.append({'name': name, 'diff': difference})
 

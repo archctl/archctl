@@ -24,7 +24,8 @@ def move_dir(src_path, dest_path, ignore_path=None):
     # Get the pathlib.Path object of the given paths
     src_path = pathlib.Path(src_path)
     dest_path = pathlib.Path(dest_path)
-    ignore_path = pathlib.Path(ignore_path)
+    if ignore_path is not None:
+        ignore_path = pathlib.Path(ignore_path)
 
     # Get the pathlib.Path object of all the non dirs in the src_path
     files = [file for file in src_path.glob('./**/*') if not file.is_dir()]
@@ -43,8 +44,18 @@ def move_dir(src_path, dest_path, ignore_path=None):
 
     # Move all the not matched files:
     for file in files:
-        file_dest_path = dest_path.join(file.relative_to(src_path))
+        file_dest_path = dest_path.joinpath(file.relative_to(src_path))
         shutil.move(file, file_dest_path)
+
+
+def get_child_folder(path):
+    path = pathlib.Path(path)
+    return [dir for dir in path.glob('./**/*') if dir.is_dir()][0]
+
+
+
+def move_file(src_path, dest_path):
+    shutil.move(pathlib.Path(src_path), pathlib.Path(dest_path))
 
 
 def exists(path):
@@ -53,20 +64,27 @@ def exists(path):
 
 def print_diff(name, diff):
     print('-' * 127 + f'\nFile name: {name}')
-    pprint(diff, width=127)
+    if isinstance(diff, list):
+        pprint(diff, width=127)
+    else:
+        for line in diff:
+            print(line)
     print('-' * 127)
 
 
-def print_diffs(diffs):
+def print_diffs(diffs, show_add):
     # Print additions
     print('Added files:')
     for addition in diffs['A']:
-        print_diff(addition['name'], addition['diff'])
+        if show_add:
+            print_diff(addition['name'], addition['diff'])
+        else:
+            print('+ ' + addition['name'])
 
     # Print deletions
     print('Deleted files:')
     for addition in diffs['D']:
-        print(f'-{addition}')
+        print(f'- {addition}')
 
     # Print modifications
     print('Modified files:')
@@ -114,8 +132,8 @@ def search_templates(repo, ref=None):
     # template folder regular expresion --> ^(.*\/)*\{\{cookiecutter\..*\}\}$
     dirs = [dir for dir in tree['tree'] if (dir['mode'] == '040000' and cookiecutter_dir_pattern.match(dir['path']))]
 
-    if len(dirs) == 1 and '/' not in dirs[0]['path']:
-        return {repo: dirs[0]['path']}
+    if '/' not in dirs[0]['path']:
+        return {'latest': None}
     else:
         # From that list of dirs, split the path to get all the folder's individual
         # names and select the name of the parent to get the template name
@@ -123,3 +141,7 @@ def search_templates(repo, ref=None):
         templates = [template['path'].split('/')[-2] for template in dirs if '/' in template['path']]
 
     return dict(zip(templates, paths))
+
+
+def file_exists(file):
+    return pathlib.Path(file).exists()

@@ -28,8 +28,6 @@ class Repo:
 class TemplateVersion:
     full_name: str
     ref: str
-    tag: bool
-    branch: str = None
 
 
 @dataclass
@@ -107,7 +105,7 @@ def get_template_version_dataclass(input_version: str) -> TemplateVersion:
     """
 
     # Check if its a ref or a Version
-    return TemplateVersion(input_version, input_version, False)
+    return TemplateVersion(input_version, input_version)
 
 
 def get_template_dataclass(input_template: str, input_template_repo: str) -> Template:
@@ -123,7 +121,7 @@ def get_template_dataclass(input_template: str, input_template_repo: str) -> Tem
     template_version = None
 
     if len(s_template) == 1:
-        template_version = get_template_version_dataclass(None)
+        template_version = None
     elif len(s_template) == 2:
         template_version = get_template_version_dataclass(s_template[1])
     else:

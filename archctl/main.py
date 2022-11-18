@@ -3,6 +3,7 @@ Main entry point for the `archctl` command.
 """
 import logging
 import os
+import time
 
 import click
 from cookiecutter.main import cookiecutter as cc
@@ -12,6 +13,7 @@ import archctl.git_utils as gu
 from archctl.user_config import JSONConfig
 import archctl.utils as utils
 from archctl.github import GHCli
+import traceback
 
 import subprocess
 
@@ -71,21 +73,6 @@ def create(repo: comm.Repo, template: comm.Template, yes, cookies=None):
             tmp_repo = gu.clone_repo(repo, repo_path)
             logger.debug(f'Repo cloned in {repo_path}')
 
-            template.template_path = utils.search_templates(template.template_repo, template.template_version.ref)[template.template]
-
-            # Render the template
-
-            # cmd = f'''cookiecutter {template.template_repo.ssh_url} -f -c {template.template_version.ref} \
-            #             -o {repo_path} --directory {template.template_path}'''
-
-
-            # if cookies is not None:
-            #     cmd += f' --config-file {cookies}'
-            # if yes:
-            #     cmd += ' --no-input'
-            
-            # subprocess.run(cmd.split())
-
             cc(template=template.template_repo.ssh_url, checkout=template.template_version.ref, no_input=yes,
                 overwrite_if_exists=True, output_dir=repo_path, config_file=cookies, directory=template.template_path)
             logger.debug(f'Template rendered to {repo_path}')
@@ -98,12 +85,11 @@ def create(repo: comm.Repo, template: comm.Template, yes, cookies=None):
             os.system('rm -rf /tmp/.archctl/')
             logger.debug('Cleaned up the tmp directory')
 
-        else:
-            logger.error('Repo couldn\'t be created')
     except Exception as e:
-        print(f'exception: {str(e)}')
-        cmd = f'gh repo delete {repo.full_name} --confirm'
-        subprocess.getoutput(cmd)
+        traceback.print_exc()
+        logger.error(f'Exception: {str(e)}')
+        cmd = f'gh repo delete {repo.full_name}'
+        subprocess.run(cmd.split())
         
         os.system('rm -rf /tmp/.archctl/')
 
@@ -115,9 +101,10 @@ def upgrade(repos, t: comm.Template, yes):
 
         # Set the working paths
         cli.cw_repo = repo
-        tmp_render = f'{TMP_DIR}render-{repo}/'
-        repo_path = f'{TMP_DIR}{repo}/'
+        tmp_render = f'{TMP_DIR}render-{repo.repo}/'
+        repo_path = f'{TMP_DIR}{repo.repo}/'
         ignore_path = f'{repo_path}.archignore'
+        cookies = f'{TMP_DIR}cookiecutter.yaml'
 
         # Clone the repo
         git_repo = gu.clone_repo(repo, repo_path)
@@ -126,12 +113,14 @@ def upgrade(repos, t: comm.Template, yes):
 
         # Get the repo ready for the upgrade
         gu.checkout(git_repo, branch)
+        # Get the cookies for that repo
+        utils.move_file(f'{repo_path}cookiecutter.yaml', cookies)
         gu.checkout(git_repo, render_branch)
         gu.publish_branch(git_repo, render_branch)
 
         # Render the template
         cc(template=t.template_repo.ssh_url, checkout=t.template_version.ref, no_input=yes,
-            overwrite_if_exists=True, output_dir=repo_path, directory=t.template_path)
+            overwrite_if_exists=True, output_dir=repo_path, config_file=cookies, directory=t.template_path)
 
         # Check if ignore file exists
         if not utils.exists(ignore_path):
@@ -150,42 +139,77 @@ def upgrade(repos, t: comm.Template, yes):
         os.system('rm -rf /tmp/.archctl/')
 
 
-def preview(repo: comm.Repo, t: comm.Template, yes):
+def preview(repo: comm.Repo, t: comm.Template, show_add, yes, cookies=None):
+
+    uc = JSONConfig()
 
     cli = GHCli()
     cli.cw_repo = repo
 
     # Set the working paths
-    tmp_render = f'{TMP_DIR}render-{repo}/'
-    repo_path = f'{TMP_DIR}{repo}/'
+    tmp_render = f'{TMP_DIR}render-{repo.repo}/'
+    repo_path = f'{TMP_DIR}{repo.repo}/'
     ignore_path = f'{repo_path}.archignore'
-    branch = repo['branch']
+    branch = repo.def_ref
     render_branch = 'archctl/preview'
 
-    # Clone the repo
-    git_repo = gu.clone_repo(repo, repo_path)
+    try:
 
-    # Checkout to the existing branch the user specified the checkout from
-    gu.checkout(git_repo, branch)
-    # Checkout to the new local branch where the render will take place
-    gu.checkout(git_repo, render_branch)
+        # Clone the repo
+        git_repo = gu.clone_repo(repo, repo_path)
+        logger.debug(f'Cloned {repo.repo} in {repo_path}')
 
-    # Render the template
-    cc(template=t.template_repo.ssh_url, checkout=t.template_version.ref, no_input=yes,
-        overwrite_if_exists=True, output_dir=tmp_render, directory=t.template_path)
+        # Checkout to the existing branch the user specified the checkout from
+        gu.checkout(git_repo, branch)
+        logger.debug(f'Checked out {repo.repo} to branch: {branch}')
 
-    # Check if ignore file exists
-    if not utils.exists(ignore_path):
-        ignore_path = None
+        if cookies is None and utils.file_exists(f'{TMP_DIR}cookiecutter.yaml'):
+            logger.debug(f'File with Cookies was found in the project\'s repo')
+            cookies = f'{TMP_DIR}cookiecutter.yaml'
+            utils.move_file(f'{repo_path}cookiecutter.yaml', cookies)
+        elif cookies is not None:
+            logger.debug(f'File with cookies was given by user')
+            cookies = os.path.abspath(cookies.name)
+        else:
+            logger.debug(f'No Cookies given, prompting user')
 
-    # Move non-ignored files to the repo
-    utils.move_dir(tmp_render, repo_path, ignore_path)
+        # Checkout to the new local branch where the render will take place
+        gu.checkout(git_repo, render_branch)
+        logger.debug(f'Checked out project to new branch to perform the render: {render_branch}')
 
-    # Generate diff between current branch (render) and user specified branch
-    utils.print_diffs(gu.diff_branches(repo, branch))
+        logger.debug(f'''Calling Cookiecutter with the following params:
+                            Template Repo: {t.template_repo.full_name}
+                            Checkout: {t.template_version.ref}
+                            No Input: {yes}
+                            Output Dir: {tmp_render}
+                            Config File: {cookies}
+                            Path to Template: {t.template_path}
+                    ''')
 
-    # Clean up the tmp dir
-    os.system('rm -rf /tmp/.archctl/')
+        # Render the template
+        cc(template=t.template_repo.ssh_url, checkout=t.template_version.ref, no_input=yes,
+            overwrite_if_exists=True, output_dir=tmp_render, config_file=cookies, directory=t.template_path)
+
+        # Check if ignore file exists
+        if not utils.exists(ignore_path):
+            ignore_path = None
+
+        # Move non-ignored files to the repo
+        tmp_render = str(utils.get_child_folder(tmp_render).absolute())
+        utils.move_dir(tmp_render, repo_path, ignore_path)
+
+        gu.commit_changes(git_repo, f'{repo_path}.', 'Preview via Archctl')
+
+        # Generate diff between current branch (render) and user specified branch
+        utils.print_diffs(gu.diff_branches(git_repo, branch), show_add)
+
+        # Clean up the tmp dir
+        os.system('rm -rf /tmp/.archctl/')
+    
+    except Exception as e:
+        traceback.print_exc()
+        logger.error(f'Exception: {str(e)}')
+        os.system('rm -rf /tmp/.archctl/')
 
 
 def search(t_repo, depth):

@@ -164,7 +164,7 @@ class GHCli(GithubIface):
 
         return self.__get_request(request)
 
-    def create_repo(self, description='', private=False):
+    def create_repo(self, description='', private=True):
         """Comment"""
 
         cmd = f'gh repo create {self.cw_repo.full_name} --add-readme -d \'{description}\''

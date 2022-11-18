@@ -13,16 +13,18 @@ import archctl.main as archctl
 import archctl.commons as comm
 import archctl.commands as cmd
 
+import time
+
 
 COMMANDS = {
-    'register': cmd.Register(),
-    'list': cmd.List(),
-    'delete': cmd.Delete(),
-    'create': cmd.Create(),
-    'upgrade': cmd.Upgrade(),
-    # 'preview': cmd.Preview(),
-    # 'search': cmd.Search(),
-    # 'version': cmd.Version()
+    'register': cmd.Register,
+    'list': cmd.List,
+    'delete': cmd.Delete,
+    'create': cmd.Create,
+    'upgrade': cmd.Upgrade,
+    # 'preview': cmd.Preview,
+    # 'search': cmd.Search,
+    # 'version': cmd.Version
 }
 
 
@@ -76,7 +78,7 @@ def it(verbose):
     command = cmd.Commands().run()
     com = COMMANDS[command]
 
-    com.run()
+    com().run()
 
 
 @main.command()
@@ -169,8 +171,18 @@ def create(cookies, name, template_repo, template, verbose, yes):
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
     validator = Validation()
+    
 
     template = comm.get_template_dataclass(template, template_repo)
+    if template.template_version is None:
+        cli = GHCli()
+        cli.cw_repo = template.template_repo
+        ref = cli.get_repo_info()['default_branch']
+        template.template_version = comm.get_template_version_dataclass(ref)
+    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
+
+
+
     repo = comm.get_repo_dataclass(name)
 
     validator.repo_exists_gh(repo, False)
@@ -198,6 +210,13 @@ def upgrade(repos, template_repo, template, verbose, yes):
 
     repos = [comm.get_repo_dataclass(repo) for repo in repos if validator.repo_exists_gh(repo)]
     template = comm.get_template_dataclass(template, template_repo)
+    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
+
+    if template.template_version is None:
+        cli = GHCli()
+        cli.cw_repo = template.template_repo
+        ref = cli.get_repo_info()['default_branch']
+        template.template_version = comm.get_template_version_dataclass(ref)
 
     validator.template(template)
 
@@ -216,27 +235,51 @@ def upgrade(repos, template_repo, template, verbose, yes):
 
 @main.command()
 @click.argument('repo')
+@click.option(
+    '-c', '--cookies',
+    type=click.File(mode='r', errors='strict'),
+    help="File containing the cookies that will be used when rendering the template"
+)
+@click.option(
+    '-s', '--show-add',
+    is_flag=True, default=False,
+    help="Show the diffs for the added files, when not set, it just shows the names of the added files"
+)
 @add_options(template_options)
 @add_options(common_options)
-def preview(repo, template, template_repo, verbose, yes):
+def preview(repo, template, template_repo, cookies, show_add, verbose, yes):
 
     setup_logger(stream_level='DEBUG' if verbose else 'INFO')
 
     validator = Validation()
+    cli = GHCli()
 
     repo = comm.get_repo_dataclass(repo)
+    if repo.def_ref is None:
+        cli.cw_repo = repo
+        repo.def_ref = cli.get_repo_info()['default_branch']
+
     template = comm.get_template_dataclass(template, template_repo)
+    if template.template_version is None:
+        
+        cli.cw_repo = template.template_repo
+        ref = cli.get_repo_info()['default_branch']
+        template.template_version = comm.get_template_version_dataclass(ref)
+    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
+
+
 
     validator.repo_exists_gh(repo)
     validator.template(template)
+    # validator.cookies(cookies, yes)
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
         validator.confirm_command_execution(repos=repo.full_name, template=template.template,
-                                            template_repo=template.template_repo,
+                                            template_repo=template.template_repo.full_name,
                                             template_ref=template.template_version.ref)
 
-    archctl.preview(repo, template, yes)
+    archctl.preview(repo, template, show_add, yes, cookies)
 
 
 @main.command()
