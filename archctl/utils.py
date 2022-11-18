@@ -1,42 +1,147 @@
-import shutil
+import logging
 import pathlib
+import re
+import shutil
+from pprint import pprint
 
 import igittigitt
+
+from archctl.github import GHCli
+
+cookiecutter_dir_pattern = re.compile('^(.*\/)*\{\{cookiecutter\..*\}\}$')
+
+logger = logging.getLogger(__name__)
 
 
 def get_ignore_parser(path):
     parser = igittigitt.IgnoreParser()
-    parser.parse_rule_file(pathlib.Path(path))
+    parser.parse_rule_file(path)
     return parser
 
 
 def move_dir(src_path, dest_path, ignore_path=None):
 
-    # Get all the non dirs in the src_path
-    files = [str(file) for file in pathlib.Path(src_path).glob('./**/*') if not file.is_dir()]
-    # Get all the dirs in the src_path
-    dirs = [str(dir) for dir in pathlib.Path(src_path).glob('./**/*') if dir.is_dir()]
+    # Get the pathlib.Path object of the given paths
+    src_path = pathlib.Path(src_path)
+    dest_path = pathlib.Path(dest_path)
+    if ignore_path is not None:
+        ignore_path = pathlib.Path(ignore_path)
+
+    # Get the pathlib.Path object of all the non dirs in the src_path
+    files = [file for file in src_path.glob('./**/*') if not file.is_dir()]
+    # Get the pathlib.Path object of all the dirs in the src_path
+    dirs = [dir for dir in src_path.glob('./**/*') if dir.is_dir()]
 
     # Exclude all the files matched by the rules in the ignore file
     if ignore_path is not None:
         parser = get_ignore_parser(ignore_path)
-        files = [file for file in files if not parser.match(pathlib.Path((file)))]
-        dirs = [dir for dir in dirs if not parser.match(pathlib.Path((dir)))]
-
-    base_path_len = len(src_path.split('/'))
+        files = [file for file in files if not parser.match((file))]
+        dirs = [dir for dir in dirs if not parser.match((dir))]
 
     for dir in dirs:
-        distance = len(dir.split('/')) - base_path_len + 1
-        relative_path = '/'.join(dir.split('/')[-distance:])
-        pathlib.Path(dest_path + relative_path).mkdir(parents=True, exist_ok=True)
+        relative_path = dir.relative_to(src_path)
+        dest_path.joinpath(relative_path).mkdir(parents=True, exist_ok=True)
 
     # Move all the not matched files:
     for file in files:
-        distance = len(file.split('/')) - base_path_len + 1
-        relative_path = '/'.join(file.split('/')[-distance:])
-        file_dest_path = dest_path + relative_path
+        file_dest_path = dest_path.joinpath(file.relative_to(src_path))
         shutil.move(file, file_dest_path)
+
+
+def get_child_folder(path):
+    path = pathlib.Path(path)
+    return [dir for dir in path.glob('./**/*') if dir.is_dir()][0]
+
+
+
+def move_file(src_path, dest_path):
+    shutil.move(pathlib.Path(src_path), pathlib.Path(dest_path))
 
 
 def exists(path):
     return pathlib.Path(path).exists()
+
+
+def print_diff(name, diff):
+    print('-' * 127 + f'\nFile name: {name}')
+    if isinstance(diff, list):
+        pprint(diff, width=127)
+    else:
+        for line in diff:
+            print(line)
+    print('-' * 127)
+
+
+def print_diffs(diffs, show_add):
+    # Print additions
+    print('Added files:')
+    for addition in diffs['A']:
+        if show_add:
+            print_diff(addition['name'], addition['diff'])
+        else:
+            print('+ ' + addition['name'])
+
+    # Print deletions
+    print('Deleted files:')
+    for addition in diffs['D']:
+        print(f'- {addition}')
+
+    # Print modifications
+    print('Modified files:')
+    for addition in diffs['M']:
+        print_diff(addition['name'], addition['diff'])
+
+
+def has_templates(repo, ref=None):
+    """Returns true if the repo has cookiecutter templates at the given ref"""
+
+    cli = GHCli()
+    cli.cw_repo = repo
+
+    # Get the tree of files recursively, to get all the files in the repo
+    # with the lowest amount of info
+    tree = cli.get_tree(ref, '1')
+
+    if not tree:
+        return False
+
+    for dir in tree['tree']:
+        if dir['mode'] == '040000' and cookiecutter_dir_pattern.match(dir['path']):
+            return True
+
+    return False
+
+
+def search_templates(repo, ref=None):
+    """ Search for cookiecutter templates in the given repo@ref
+        Returns a dictionary where the name of the template is the key and
+        the path to the template is the value.
+    """
+
+    cli = GHCli()
+    cli.cw_repo = repo
+
+    # Get the tree of files recursively, to get all the files in the repo
+    # with the lowest amount of info
+    tree = cli.get_tree(ref, '1')
+
+    if not tree:
+        return False
+
+    # Get all the directories in the tree that match the cookiecutter project
+    # template folder regular expresion --> ^(.*\/)*\{\{cookiecutter\..*\}\}$
+    dirs = [dir for dir in tree['tree'] if (dir['mode'] == '040000' and cookiecutter_dir_pattern.match(dir['path']))]
+
+    if '/' not in dirs[0]['path']:
+        return {'latest': None}
+    else:
+        # From that list of dirs, split the path to get all the folder's individual
+        # names and select the name of the parent to get the template name
+        paths = ['/'.join(template['path'].split('/')[:-1]) for template in dirs if '/' in template['path']]
+        templates = [template['path'].split('/')[-2] for template in dirs if '/' in template['path']]
+
+    return dict(zip(templates, paths))
+
+
+def file_exists(file):
+    return pathlib.Path(file).exists()
