@@ -101,7 +101,35 @@ def upgrade(repos, t_repo, t, path, yes):
         ignore_path = f'{repo_path}.archignore'
 
         # Clone the repo
-        git_repo = git_util.clone_repo(name, repo_path)
+        git_repo = gu.clone_repo(repo, repo_path)
+        logger.debug(f'Cloned {repo.repo} in {repo_path}')
+
+        # Checkout to the existing branch the user specified the checkout from
+        gu.checkout(git_repo, branch)
+        logger.debug(f'Checked out {repo.repo} to branch: {branch}')
+
+        if cookies is None and utils.file_exists(f'{TMP_DIR}cookiecutter.yaml'):
+            logger.debug(f'File with Cookies was found in the project\'s repo')
+            cookies = f'{TMP_DIR}cookiecutter.yaml'
+            utils.move_file(f'{repo_path}cookiecutter.yaml', cookies)
+        elif cookies is not None:
+            logger.debug(f'File with cookies was given by user')
+            cookies = os.path.abspath(cookies.name)
+        else:
+            logger.debug(f'No Cookies given, prompting user')
+
+        # Checkout to the new local branch where the render will take place
+        gu.checkout(git_repo, render_branch)
+        logger.debug(f'Checked out project to new branch to perform the render: {render_branch}')
+
+        logger.debug(f'''Calling Cookiecutter with the following params:
+                            Template Repo: {t.template_repo.full_name}
+                            Checkout: {t.template_version.ref}
+                            No Input: {yes}
+                            Output Dir: {tmp_render}
+                            Config File: {cookies}
+                            PAth : {t.template_path}
+                    ''')
 
         # Render the template
         cc(template=template, checkout=t[1], no_input=yes, overwrite_if_exists=True,
@@ -119,3 +147,38 @@ def upgrade(repos, t_repo, t, path, yes):
 
         # Clean up the tmp dir
         os.system('rm -rf /tmp/.archctl/')
+    
+    except Exception as e:
+        traceback.print_exc()
+        logger.error(f'Exception: {str(e)}')
+        os.system('rm -rf /tmp/.archctl/')
+
+
+def search(t_repo: comm.Repo, depth, ref=None):
+    """
+        Searches for the available templates in the given template_repo and
+        displays them along with depth versions.
+
+        Ex:
+            java:
+                - java@v1
+                - java@main/fb788fc
+    """
+
+    cli = GHCli()
+    cli.cw_repo = t_repo
+
+    templates = []
+
+    if ref is None:
+        ref = t_repo.def_ref
+    
+    templates = utils.search_templates(t_repo, ref)
+
+    templates = [comm.Template(t, t_repo, p, None) for t, p in templates.items() ]
+
+    versions = 
+
+    for template in templates:
+
+
