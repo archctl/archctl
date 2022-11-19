@@ -25,15 +25,17 @@ class Repo:
 
 
 @dataclass
+class TemplateVersion:
+    full_name: str
+    ref: str
+
+
+@dataclass
 class Template:
     template: str
     template_repo: Repo
     template_path: str
-
-@dataclass
-class TemplateVersion:
-    template = Template
-    ref: str
+    template_version: TemplateVersion
 
 
 def get_repo_dataclass(input_repo: str) -> Repo:
@@ -93,7 +95,20 @@ def get_repo_dataclass(input_repo: str) -> Repo:
     return Repo(owner, repo, full_name, ssh_url, https_url, def_ref)
 
 
-def get_template_version_dataclass(input_template: str, input_template_repo: str) -> Template:
+def get_template_version_dataclass(input_version: str) -> TemplateVersion:
+    """
+    Parse user input to a TemplateVersion dataclass object
+
+    Considered input format:
+        {ref}
+        {version}
+    """
+
+    # Check if its a ref or a Version
+    return TemplateVersion(input_version, input_version)
+
+
+def get_template_dataclass(input_template: str, input_template_repo: str) -> Template:
     """
     Parse user input to a Template dataclass object
 
@@ -103,22 +118,19 @@ def get_template_version_dataclass(input_template: str, input_template_repo: str
     """
 
     s_template = input_template.split('@')
-    ref = None
+    template_version = None
 
     if len(s_template) == 1:
-        ref = None
+        template_version = None
     elif len(s_template) == 2:
-        ref = get_template_version_dataclass(s_template[1])
+        template_version = get_template_version_dataclass(s_template[1])
     else:
         logger.error('The indicated template contains errors in its format')
 
     template = s_template[0]
     template_repo = get_repo_dataclass(input_template_repo)
 
-    template = Template(template, template_repo, None)
-
-
-    return 
+    return Template(template, template_repo, None, template_version)
 
 
 def auth_status():
