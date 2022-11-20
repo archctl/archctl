@@ -45,6 +45,11 @@ class GithubIface(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_tags(self):
+        """Comment"""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_tree(self, tree_sha=None, recursive='0'):
         """Get a tree of the given repo, if sha is None, get the root tree of the repo"""
         raise NotImplementedError
@@ -106,11 +111,11 @@ class GHCli(GithubIface):
 
         except subprocess.CalledProcessError:
             logger.debug('Problem running the GitHub CLI command')
-            return False
+            return {}
 
         except ValueError:
             logger.debug('Problem decoding GitHub API response')
-            return False
+            return {}
 
     def get_repo_info(self):
         """Get the general info of a repo"""
@@ -144,23 +149,34 @@ class GHCli(GithubIface):
 
         return branch in branches
 
-    def get_commits(self, path=None):
+    def get_commits(self, path=None, sha=None):
         """Comment"""
 
         request = f'repos/{self.cw_repo.full_name}/commits'
 
-        if path is not None:
+        if path is not None and sha is None:
             request += f'?path={path}'
+        elif path is None and sha is not None:
+            request += f'?sha={sha}'
+        elif path is not None and sha is not None:
+            request += f'?sha={sha}&path={path}'
 
-        return self.__get_request(path)
+        return self.__get_request(request)
 
-    def get_tree(self, tree_sha=None, recursive='0'):
+    def list_tags(self):
+        '''Lists all tags in the repo'''
+
+        request = f'repos/{self.cw_repo.full_name}/tags'
+
+        return self.__get_request(request)
+
+    def get_tree(self, ref=None, recursive='0'):
         """Get a tree of the given repo, if sha is None, get the root tree of the repo"""
 
-        if tree_sha is None:
-            tree_sha = self.get_branch_info(self.get_default_branch())['commit']['commit']['tree']['sha']
+        if ref is None:
+            ref = self.get_default_branch()
 
-        request = f'repos/{self.cw_repo.full_name}/git/trees/{tree_sha}?recursive=0'
+        request = f'repos/{self.cw_repo.full_name}/git/trees/{ref}?recursive=0'
 
         return self.__get_request(request)
 

@@ -90,18 +90,18 @@ class Create(Command):
 
         ref = self.prompt.ref_list(branches)
 
-        templates = search_templates(t_repo, ref)
+        templates = search_templates(self.cli, ref)
         template = self.prompt.template_list(templates) + '@' + ref
 
         template = comm.get_template_dataclass(template, t_repo)
-        template.template_path = search_templates(template.template_repo, template.template_version.ref)[template.template]
+        template.template_path = search_templates(self.cli, template.template_version.ref)[template.template]
 
         if template.template_version is None:
             cli = GHCli()
             cli.cw_repo = template.template_repo
             ref = cli.get_repo_info()['default_branch']
             template.template_version = comm.get_template_version_dataclass(ref)
-        
+
         self.validator.confirm_command_execution(project_name=repo.full_name, template_repo=template.template_repo.full_name,
                                                     template=template.template, version=template.template_version.full_name)
 
@@ -208,7 +208,7 @@ class Upgrade(Command):
 
         ref = self.prompt.ref_list(branches)
 
-        templates = search_templates(t_repo, ref)
+        templates = search_templates(self.cli, ref)
         template = self.prompt.template_list(templates) + '@' + ref
 
         template = comm.get_template_dataclass(template, t_repo)

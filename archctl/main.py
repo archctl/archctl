@@ -3,7 +3,6 @@ Main entry point for the `archctl` command.
 """
 import logging
 import os
-import time
 
 import click
 from cookiecutter.main import cookiecutter as cc
@@ -14,6 +13,8 @@ from archctl.user_config import JSONConfig
 import archctl.utils as utils
 from archctl.github import GHCli
 import traceback
+
+from pprint import pprint
 
 import subprocess
 
@@ -90,8 +91,9 @@ def create(repo: comm.Repo, template: comm.Template, yes, cookies=None):
         logger.error(f'Exception: {str(e)}')
         cmd = f'gh repo delete {repo.full_name}'
         subprocess.run(cmd.split())
-        
+
         os.system('rm -rf /tmp/.archctl/')
+
 
 def upgrade(repos, t: comm.Template, yes):
 
@@ -141,8 +143,6 @@ def upgrade(repos, t: comm.Template, yes):
 
 def preview(repo: comm.Repo, t: comm.Template, show_add, yes, cookies=None):
 
-    uc = JSONConfig()
-
     cli = GHCli()
     cli.cw_repo = repo
 
@@ -163,15 +163,15 @@ def preview(repo: comm.Repo, t: comm.Template, show_add, yes, cookies=None):
         gu.checkout(git_repo, branch)
         logger.debug(f'Checked out {repo.repo} to branch: {branch}')
 
-        if cookies is None and utils.file_exists(f'{TMP_DIR}cookiecutter.yaml'):
-            logger.debug(f'File with Cookies was found in the project\'s repo')
+        if cookies is None and utils.exists(f'{TMP_DIR}cookiecutter.yaml'):
+            logger.debug('File with Cookies was found in the project\'s repo')
             cookies = f'{TMP_DIR}cookiecutter.yaml'
             utils.move_file(f'{repo_path}cookiecutter.yaml', cookies)
         elif cookies is not None:
-            logger.debug(f'File with cookies was given by user')
+            logger.debug('File with cookies was given by user')
             cookies = os.path.abspath(cookies.name)
         else:
-            logger.debug(f'No Cookies given, prompting user')
+            logger.debug('No Cookies given, prompting user')
 
         # Checkout to the new local branch where the render will take place
         gu.checkout(git_repo, render_branch)
@@ -179,7 +179,7 @@ def preview(repo: comm.Repo, t: comm.Template, show_add, yes, cookies=None):
 
         logger.debug(f'''Calling Cookiecutter with the following params:
                             Template Repo: {t.template_repo.full_name}
-                            Checkout: {t.template_version.ref}
+                            Checkout: {t.template_repo.def_ref}
                             No Input: {yes}
                             Output Dir: {tmp_render}
                             Config File: {cookies}
@@ -205,14 +205,14 @@ def preview(repo: comm.Repo, t: comm.Template, show_add, yes, cookies=None):
 
         # Clean up the tmp dir
         os.system('rm -rf /tmp/.archctl/')
-    
+
     except Exception as e:
         traceback.print_exc()
         logger.error(f'Exception: {str(e)}')
         os.system('rm -rf /tmp/.archctl/')
 
 
-def search(t_repo, depth):
+def search(t_repo: comm.Repo, depth, tags, template=None):
     """
         Searches for the available templates in the given template_repo and
         displays them along with depth versions.
@@ -222,3 +222,50 @@ def search(t_repo, depth):
                 - java@v1
                 - java@main/fb788fc
     """
+
+    cli = GHCli()
+    cli.cw_repo = t_repo
+
+    search_resul = {}
+
+    multiple_templates = len(utils.search_templates(cli)) > 1 and template is None
+
+    '''
+        {
+            {template}: {
+                tags: [],
+                branches: [depth commits]
+            },
+        }
+    '''
+
+    if tags:
+        repo_tags = [{'name': tag['name'], 'sha': tag['commit']['sha']} for tag in cli.list_tags()][:depth]
+        if multiple_templates:
+            for tag in repo_tags:
+                if template is None:
+                    search_resul = utils.inspect_tag(search_resul, cli, tag)
+                else:
+                    search_resul = utils.inspect_tag(search_resul, cli, tag, template)
+        else:
+            if template is None:
+                search_resul[t_repo.repo] = {'tags': [tag['name'] for tag in repo_tags]}
+            else:
+                for tag in repo_tags:
+                    search_resul = utils.inspect_tag(search_resul, cli, tag, template)
+    else:
+        repo_branches = [branch['name'] for branch in cli.list_branches()]
+        if multiple_templates:
+            for branch in repo_branches:
+                if template is None:
+                    search_resul = utils.inspect_branch(search_resul, cli, branch, depth)
+                else:
+                    search_resul = utils.inspect_branch(search_resul, cli, branch, depth, template)
+
+        else:
+            if template is None:
+                template = comm.Template(t_repo.repo, t_repo, None)
+            for branch in repo_branches:
+                search_resul = utils.inspect_branch(search_resul, cli, branch, depth, template)
+
+    utils.print_search(search_resul, tags)
