@@ -1,13 +1,11 @@
 import difflib
 from pathlib import Path
 
-import git
-
-import archctl.commons as comm
+from git.repo import Repo
 
 
-def clone_repo(repo: comm.Repo, path):
-    return git.Repo.clone_from(repo.ssh_url, path)
+def clone_repo(repo, path):
+    return Repo.clone_from(repo.ssh_url, path)
 
 
 def commit_changes(repo, path, message):
@@ -32,7 +30,7 @@ def checkout(repo, new_branch):
 
 
 def publish_branch(repo, branch):
-    repo.git.push('--set-upstream', 'origin', branch)
+    repo.git.push("--set-upstream", "origin", branch)
 
 
 def diff_branches(repo, branch):
@@ -41,7 +39,7 @@ def diff_branches(repo, branch):
     commit_feature = repo.head.commit.tree
 
     # The last commit in the target branch
-    commit_origin_dev = repo.commit(f'origin/{branch}')
+    commit_origin_dev = repo.commit(f"origin/{branch}")
 
     # Get the iterator with all the diffs between both commits
     diff_index = commit_origin_dev.diff(commit_feature)
@@ -51,22 +49,22 @@ def diff_branches(repo, branch):
 
     # Collection all new files
     added = []
-    for diff in diff_index.iter_change_type('A'):
+    for diff in diff_index.iter_change_type("A"):
         # Get the content of the blob of the newly created file
-        blob = diff.b_blob.data_stream.read().decode('utf-8').splitlines()
+        blob = diff.b_blob.data_stream.read().decode("utf-8").splitlines()
 
         # Get the name of the file
         name = Path(diff.b_path).name
 
         # Get the changes to the file as diff
-        difference = list(differ.compare('', blob))
+        difference = list(differ.compare("", blob))
 
         # Add the dictionary with the name and diff to the list of added files
-        added.append({'name': name, 'diff': difference})
+        added.append({"name": name, "diff": difference})
 
     # Collection all deleted files
     deleted = []
-    for diff in diff_index.iter_change_type('D'):
+    for diff in diff_index.iter_change_type("D"):
 
         # Get the name of the file
         name = Path(diff.a_path).name
@@ -75,18 +73,18 @@ def diff_branches(repo, branch):
 
     # Collection all modified files
     modified = []
-    for diff in diff_index.iter_change_type('M'):
+    for diff in diff_index.iter_change_type("M"):
         # Get the contents of the blobs
-        a_content = diff.a_blob.data_stream.read().decode('utf-8').splitlines()
-        b_content = diff.b_blob.data_stream.read().decode('utf-8').splitlines()
+        a_content = diff.a_blob.data_stream.read().decode("utf-8").splitlines()
+        b_content = diff.b_blob.data_stream.read().decode("utf-8").splitlines()
 
         # Get the name of the file
         name = Path(diff.b_path).name
 
-        difference = difflib.context_diff(a_content, b_content, Path(diff.a_path).name, Path(diff.b_path).name)
+        difference = difflib.context_diff(
+            a_content, b_content, Path(diff.a_path).name, Path(diff.b_path).name
+        )
 
-        #difference = [line for line in list(differ.compare(a_content, b_content)) if (line.startswith('+') or line.startswith('-'))]
+        modified.append({"name": name, "diff": difference})
 
-        modified.append({'name': name, 'diff': difference})
-
-    return {'A': added, 'D': deleted, 'M': modified}
+    return {"A": added, "D": deleted, "M": modified}

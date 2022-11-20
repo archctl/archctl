@@ -3,26 +3,26 @@ import logging
 import sys
 
 LOG_LEVELS = {
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL,
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
 }
 
 LOG_FORMATS = {
-    'DEBUG': '%(levelname)s %(name)s: %(message)s',
-    'INFO': '%(levelname)s: %(message)s',
+    "DEBUG": "%(levelname)s %(name)s: %(message)s",
+    "INFO": "%(levelname)s: %(message)s",
 }
 
 
-def setup_logger(stream_level='DEBUG'):
+def setup_logger(stream_level="DEBUG"):
     """Configure logger for archctl
     Set up logging to stdout with given level, defaults to DEBUG.
     """
 
     # Create logger for archctl moduke
-    logger = logging.getLogger('archctl')
+    logger = logging.getLogger("archctl")
     logger.setLevel(logging.DEBUG)
 
     # Remove all attached handlers, in case there was
