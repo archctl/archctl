@@ -8,7 +8,6 @@ import archctl.commons as comm
 
 
 class UserConfig(ABC):
-
     @abstractmethod
     def create_config_file(self):
         """Create the user config file if it didn't exist"""
@@ -48,8 +47,8 @@ class UserConfig(ABC):
 
 class JSONConfig(UserConfig):
 
-    __CONFIG_PATH = environ['HOME'] + '/.archctl'
-    __BASE_CONFIG = {'t_repos': [], 'p_repos': []}
+    __CONFIG_PATH = environ["HOME"] + "/.archctl"
+    __BASE_CONFIG = {"t_repos": [], "p_repos": []}
 
     def __user_config_exists(self):
         """Check if the user config file exists"""
@@ -64,11 +63,11 @@ class JSONConfig(UserConfig):
                 return json.load(json_file)
         except json.decoder.JSONDecodeError:
             self.create_config_file()
-            return {'t_repos': [], 'p_repos': []}
+            return {"t_repos": [], "p_repos": []}
 
     def __write_user_config(self, config):
         """Overwrite user config with new config"""
-        with open(self.__CONFIG_PATH, 'w') as outfile:
+        with open(self.__CONFIG_PATH, "w") as outfile:
             json.dump(config, outfile)
 
     def create_config_file(self):
@@ -78,23 +77,27 @@ class JSONConfig(UserConfig):
     def project_repos(self) -> list[comm.Repo]:
         """Get all the Project repos stored in the user config"""
         config = self.__read_user_config()
-        return [comm.Repo(**repo) for repo in config['p_repos']]
+        return [comm.Repo(**repo) for repo in config["p_repos"]]
 
     def template_repos(self) -> list[comm.Repo]:
         """Get all the Template repos stored in the user config"""
         config = self.__read_user_config()
-        return [comm.Repo(**repo) for repo in config['t_repos']]
+        return [comm.Repo(**repo) for repo in config["t_repos"]]
 
     def set_p_repos(self, p_repos: list[comm.Repo]):
         """Set the project repos"""
         config = self.__read_user_config()
-        config['p_repos'] = json.loads(json.dumps(p_repos, cls=comm.EnhancedJSONEncoder))
+        config["p_repos"] = json.loads(
+            json.dumps(p_repos, cls=comm.EnhancedJSONEncoder)
+        )
         self.__write_user_config(config)
 
     def set_t_repos(self, t_repos: list[comm.Repo]):
         """Set the template repos"""
         config = self.__read_user_config()
-        config['t_repos'] = json.loads(json.dumps(t_repos, cls=comm.EnhancedJSONEncoder))
+        config["t_repos"] = json.loads(
+            json.dumps(t_repos, cls=comm.EnhancedJSONEncoder)
+        )
         self.__write_user_config(config)
 
     def add_p_repo(self, p_repo):

@@ -13,38 +13,33 @@ import archctl.main as archctl
 import archctl.commons as comm
 import archctl.commands as cmd
 
-import time
-
 
 COMMANDS = {
-    'register': cmd.Register,
-    'list': cmd.List,
-    'delete': cmd.Delete,
-    'create': cmd.Create,
-    'upgrade': cmd.Upgrade,
-    # 'preview': cmd.Preview,
-    # 'search': cmd.Search,
+    "register": cmd.Register,
+    "list": cmd.List,
+    "delete": cmd.Delete,
+    "create": cmd.Create,
+    "upgrade": cmd.Upgrade,
+    "preview": cmd.Preview,
+    "search": cmd.Search,
     # 'version': cmd.Version
 }
 
 
 common_options = [
     click.option(
-        '-y', '--yes-all', 'yes',
-        is_flag=True, default=False, is_eager=True,
-        help="No interaction, perform the command without asking"
+        "-y",
+        "--yes-all",
+        "yes",
+        is_flag=True,
+        default=False,
+        is_eager=True,
+        help="No interaction, perform the command without asking",
     ),
-    click.option('-v', '--verbose', is_flag=True, default=False, is_eager=True)
+    click.option("-v", "--verbose", is_flag=True, default=False, is_eager=True),
 ]
 
-template_options = [
-    click.argument(
-        'template-repo'
-    ),
-    click.argument(
-        'template'
-    )
-]
+template_options = [click.argument("template-repo"), click.argument("template")]
 
 
 def add_options(options):
@@ -52,6 +47,7 @@ def add_options(options):
         for option in reversed(options):
             func = option(func)
         return func
+
     return _add_options
 
 
@@ -63,17 +59,16 @@ def version_msg():
 
 
 @click.group()
-@click.version_option(__version__, '-V', '--version', message=version_msg())
+@click.version_option(__version__, "-V", "--version", message=version_msg())
 def main():
-    """Renders the archetype
-    """
+    """Renders the archetype"""
 
 
 @main.command()
-@click.option('-v', '--verbose', is_flag=True, default=False)
+@click.option("-v", "--verbose", is_flag=True, default=False)
 def it(verbose):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     command = cmd.Commands().run()
     com = COMMANDS[command]
@@ -82,14 +77,10 @@ def it(verbose):
 
 
 @main.command()
-@click.argument('repo')
+@click.argument("repo")
+@click.option("-k", "--kind", type=click.Choice(["Project", "Template"]))
 @click.option(
-    '-k', '--kind',
-    type=click.Choice(['Project', 'Template'])
-)
-@click.option(
-    '-b', '--branch',
-    help="Default branch to chekout from when updating/previewing"
+    "-b", "--branch", help="Default branch to chekout from when updating/previewing"
 )
 @add_options(common_options)
 def register(repo, kind, branch, yes, verbose):
@@ -98,7 +89,7 @@ def register(repo, kind, branch, yes, verbose):
         REPO        Name (owner/name) or URL of the repo being added
     """
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     repo = comm.get_repo_dataclass(repo)
 
@@ -111,15 +102,15 @@ def register(repo, kind, branch, yes, verbose):
     validator.repo_exists_uc(repo, False)
 
     if kind is None:
-        if util.has_templates(repo):
-            kind = 'Template'
+        if util.has_templates(cli):
+            kind = "Template"
         else:
-            kind = 'Project'
+            kind = "Project"
     else:
         validator.kind(repo, kind)
 
     if branch is None:
-        branch = cli.get_repo_info()['default_branch']
+        branch = cli.get_default_branch()
         repo.def_ref = branch
     else:
         validator.branch_exists_in_repo(repo, branch)
@@ -127,7 +118,9 @@ def register(repo, kind, branch, yes, verbose):
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
         # Just do it
-        validator.confirm_command_execution(repo=repo.full_name, kind=kind, branch=repo.def_ref)
+        validator.confirm_command_execution(
+            repo=repo.full_name, kind=kind, branch=repo.def_ref
+        )
 
     archctl.register(repo, kind)
 
@@ -138,11 +131,11 @@ def list():
 
 
 @main.command()
-@click.argument('repo', required=True)
+@click.argument("repo", required=True)
 @add_options(common_options)
 def delete(repo, yes, verbose):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
 
@@ -158,32 +151,36 @@ def delete(repo, yes, verbose):
 
 
 @main.command()
-@click.argument('name')
+@click.argument("name")
 @add_options(template_options)
 @click.option(
-    '-c', '--cookies',
-    type=click.File(mode='r', errors='strict'),
-    help="File containing the cookies that will be used when rendering the template"
+    "-c",
+    "--cookies",
+    type=click.File(mode="r", errors="strict"),
+    help="File containing the cookies that will be used when rendering the template",
 )
 @add_options(common_options)
 def create(cookies, name, template_repo, template, verbose, yes):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
-    
-
-    template = comm.get_template_dataclass(template, template_repo)
-    if template.template_version is None:
-        cli = GHCli()
-        cli.cw_repo = template.template_repo
-        ref = cli.get_repo_info()['default_branch']
-        template.template_version = comm.get_template_version_dataclass(ref)
-    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
-
-
+    cli = GHCli()
 
     repo = comm.get_repo_dataclass(name)
+    t = comm.get_template_version_dataclass(template, template_repo)
+
+    cli.cw_repo = template_repo
+    if t.ref is None:
+        t.ref = cli.get_default_branch()
+
+    templates = util.search_templates(cli, t.ref)
+    if templates:
+        t.template.template_path = [
+            temp.template_path
+            for temp in templates
+            if temp.template == t.template.template
+        ][0]
 
     validator.repo_exists_gh(repo, False)
     validator.template(template)
@@ -191,65 +188,85 @@ def create(cookies, name, template_repo, template, verbose, yes):
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
-        validator.confirm_command_execution(name=repo.full_name, template=template.template,
-                                            template_repo=template.template_repo.full_name,
-                                            template_ref=template.template_version.ref)
+        validator.confirm_command_execution(
+            name=repo.full_name,
+            template=template.template,
+            template_repo=template.template_repo.full_name,
+            template_ref=template.template_version.ref,
+        )
 
-    archctl.create(repo, template, yes, cookies)
+    archctl.create(repo, t, yes, cookies)
 
 
 @main.command()
-@click.argument('repos', nargs=-1, required=True)
+@click.argument("repos", nargs=-1, required=True)
 @add_options(template_options)
 @add_options(common_options)
 def upgrade(repos, template_repo, template, verbose, yes):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
+    cli = GHCli()
+    template_repo = comm.get_repo_dataclass(template_repo)
 
-    repos = [comm.get_repo_dataclass(repo) for repo in repos if validator.repo_exists_gh(repo)]
-    template = comm.get_template_dataclass(template, template_repo)
-    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
+    repos = [
+        comm.get_repo_dataclass(repo)
+        for repo in repos
+        if validator.repo_exists_gh(repo)
+    ]
+    t = comm.get_template_version_dataclass(template, template_repo)
 
-    if template.template_version is None:
-        cli = GHCli()
-        cli.cw_repo = template.template_repo
-        ref = cli.get_repo_info()['default_branch']
-        template.template_version = comm.get_template_version_dataclass(ref)
+    cli.cw_repo = template_repo
+    templates = util.search_templates(cli, t.ref)
+    if templates:
+        t.template.template_path = [
+            temp.template_path
+            for temp in templates
+            if temp.template == t.template.template
+        ][0]
+
+    if t.ref is None:
+        t.ref = cli.get_default_branch()
 
     validator.template(template)
 
     # If running in --yes-all mode, skip any user confirmation
     if yes:
         # Just do it
-        print('Yeah')
+        print("Yeah")
     else:
         names = [repo.full_name for repo in repos]
-        validator.confirm_command_execution(repos=names, template=template.template,
-                                            template_repo=template.template_repo,
-                                            template_ref=template.template_version.ref)
+        validator.confirm_command_execution(
+            repos=names,
+            template=template.template,
+            template_repo=template.template_repo,
+            template_ref=template.template_version.ref,
+        )
 
-    archctl.upgrade(repos, template, yes)
+    archctl.upgrade(repos, t, yes)
 
 
 @main.command()
-@click.argument('repo')
+@click.argument("repo")
 @click.option(
-    '-c', '--cookies',
-    type=click.File(mode='r', errors='strict'),
-    help="File containing the cookies that will be used when rendering the template"
+    "-c",
+    "--cookies",
+    type=click.File(mode="r", errors="strict"),
+    help="File containing the cookies that will be used when rendering the template",
 )
 @click.option(
-    '-s', '--show-add',
-    is_flag=True, default=False,
-    help="Show the diffs for the added files, when not set, it just shows the names of the added files"
+    "-s",
+    "--show-add",
+    is_flag=True,
+    default=False,
+    help="Show the diffs for the added files, when not set, it just shows the names of the added files",
 )
 @add_options(template_options)
 @add_options(common_options)
 def preview(repo, template, template_repo, cookies, show_add, verbose, yes):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
     cli = GHCli()
@@ -257,17 +274,21 @@ def preview(repo, template, template_repo, cookies, show_add, verbose, yes):
     repo = comm.get_repo_dataclass(repo)
     if repo.def_ref is None:
         cli.cw_repo = repo
-        repo.def_ref = cli.get_repo_info()['default_branch']
+        repo.def_ref = cli.get_default_branch()
 
-    template = comm.get_template_dataclass(template, template_repo)
-    if template.template_version is None:
-        
-        cli.cw_repo = template.template_repo
-        ref = cli.get_repo_info()['default_branch']
-        template.template_version = comm.get_template_version_dataclass(ref)
-    template.template_path = util.search_templates(template.template_repo, template.template_version.ref)[template.template]
+    template_repo = comm.get_repo_dataclass(template_repo)
+    t = comm.get_template_version_dataclass(template, template_repo)
+    if t.ref is None:
+        cli.cw_repo = template_repo
+        t.ref = cli.get_default_branch()
 
-
+    templates = util.search_templates(cli, t.ref)
+    if templates:
+        t.template.template_path = [
+            temp.template_path
+            for temp in templates
+            if temp.template == t.template.template
+        ][0]
 
     validator.repo_exists_gh(repo)
     validator.template(template)
@@ -275,51 +296,68 @@ def preview(repo, template, template_repo, cookies, show_add, verbose, yes):
 
     # If running in --yes-all mode, skip any user confirmation
     if not yes:
-        validator.confirm_command_execution(repos=repo.full_name, template=template.template,
-                                            template_repo=template.template_repo.full_name,
-                                            template_ref=template.template_version.ref)
+        validator.confirm_command_execution(
+            repos=repo.full_name,
+            template=template.template,
+            template_repo=template.template_repo.full_name,
+            template_ref=template.template_version.ref,
+        )
 
-    archctl.preview(repo, template, show_add, yes, cookies)
+    archctl.preview(repo, t, show_add, yes, cookies)
 
 
 @main.command()
-@click.argument('repo')
+@click.argument("repo")
 @click.option(
-    '-d', '--depth', type=int, default=3,
-    help="Number of commits to search for in each template/branch"
+    "-d",
+    "--depth",
+    type=int,
+    default=3,
+    help="Number of commits to search for in each template/branch",
 )
+@click.option("-t", "--template", help="")
+@click.option("--tags", is_flag=True, default=False, help="")
 @add_options(common_options)
-def search(repo, depth, verbose, yes):
+def search(repo, depth, template, tags, verbose, yes):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
 
     repo = comm.get_repo_dataclass(repo)
 
+    if template is not None:
+        template = comm.get_template_version_dataclass(template, repo)
+        cli = GHCli()
+        cli.cw_repo = repo
+        templates = util.search_templates(cli, template.ref)
+        if templates:
+            template.template.template_path = [
+                temp.template_path
+                for temp in templates
+                if temp.template == template.template.template
+            ][0]
+        if template.ref is None:
+            template.ref = cli.get_default_branch()
+        validator.template(template)
+
     validator.repo_exists_gh(repo)
     validator.depth(depth)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         validator.confirm_command_execution(repo=repo.full_name, depth=depth)
 
-    archctl.search(repo, depth)
+    archctl.search(repo, depth, tags, template)
 
 
 @main.command()
-@click.argument('repo')
-@click.option(
-    '-d', '--depth', type=int, default=5,
-    help=""
-)
+@click.argument("repo")
+@click.option("-d", "--depth", type=int, default=5, help="")
 @add_options(common_options)
 def version(repo, depth, verbose, yes):
 
-    setup_logger(stream_level='DEBUG' if verbose else 'INFO')
+    setup_logger(stream_level="DEBUG" if verbose else "INFO")
 
     validator = Validation()
 
@@ -329,13 +367,10 @@ def version(repo, depth, verbose, yes):
     validator.depth(depth)
 
     # If running in --yes-all mode, skip any user confirmation
-    if yes:
-        # Just do it
-        print('Yeah')
-    else:
+    if not yes:
         validator.confirm_command_execution(repo=repo, depth=depth)
 
-    archctl.search(repo, depth)
+    # archctl.version(repo, depth)
 
 
 if __name__ == "__main__":
